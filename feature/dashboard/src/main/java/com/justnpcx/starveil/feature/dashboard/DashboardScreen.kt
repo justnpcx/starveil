@@ -41,9 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -156,16 +153,12 @@ fun DashboardScreen(
         // 700dp phone shows the whole page without a scroll while an 872dp one
         // keeps the 0.9.4 composition pixel for pixel.
         val metrics = homeMetricsFor(maxHeight)
-        // What the status slot would say, decided before the slot is measured:
-        // an empty slot costs nothing below the standard tier.
-        val firstConnectHint = !state.everConnected &&
-            state.coreState == ConnectionState.DISCONNECTED &&
-            noticeText == null
-        // The first-connect hint is a second copy of what the ring already
-        // says ("tap to connect"); on a screen that has no height to spare it
-        // is the first thing to go, and the slot then costs nothing.
-        val showFirstHint = firstConnectHint && !metrics.collapseEmptySlot
-        val slotHasContent = showFirstHint || (persistent && noticeText != null)
+        // What the status slot says: a persistent condition, and nothing else.
+        // The first-connect hint that used to live here was a second copy of
+        // the ring's own "Tap to connect", 24dp below it — the ring already
+        // carries the instruction, so the slot now costs nothing until there
+        // is something to report.
+        val slotHasContent = persistent && noticeText != null
         val slotHeight = if (metrics.collapseEmptySlot && !slotHasContent) 0.dp else metrics.contextSlot
         Column(
             modifier = Modifier
@@ -227,18 +220,6 @@ fun DashboardScreen(
                     .height(slotHeight),
                 contentAlignment = Alignment.Center,
             ) {
-                // The hint lives in the slot that already exists for one line
-                // of state explanation, so showing and hiding it cannot move
-                // the ring, the rates, or anything below.
-                if (showFirstHint) {
-                    Text(
-                        text = stringResource(R.string.dashboard_first_connect_hint),
-                        style = StarveilType.label,
-                        color = StarveilColors.ink2,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
                 if (persistent && noticeText != null) {
                     val expandable = notice is DashboardNotice.KernelRefused
                     Text(
@@ -776,34 +757,12 @@ private fun CurrentNodeCard(
     onModeChange: (NodeSelectionMode) -> Unit,
     padding: Dp = StarveilSpacing.lg,
 ) {
-    val veil = StarveilColors.veil
     StarveilCard(onClick = onOpen) {
         Box {
             Column(modifier = Modifier.padding(padding)) {
-                // The gauze covers the card's information area and stops
-                // there. It used to fill the card, which put diagonal bands
-                // behind the segmented control's own labels — texture and
-                // control fighting for the same few pixels.
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .drawBehind {
-                                val period = 74.dp.toPx()
-                                val band = 10.dp.toPx()
-                                rotate(degrees = 25f) {
-                                    var x = -size.height
-                                    while (x < size.width + size.height) {
-                                        drawRect(
-                                            color = veil,
-                                            topLeft = Offset(x, -size.height),
-                                            size = Size(band, size.height * 3f),
-                                        )
-                                        x += period
-                                    }
-                                }
-                            },
-                    )
+                // No texture. The card is already separated from the page
+                // by its edge, its shadow and the page's own wash; a drawn
+                // weave on top of that read as a smudge at phone size.
                 Row(verticalAlignment = Alignment.Top) {
                     Column(modifier = Modifier.weight(1f)) {
                         NodeName(name = name)
@@ -852,7 +811,6 @@ private fun CurrentNodeCard(
                         style = StarveilType.label,
                         color = StarveilColors.ink2,
                     )
-                }
                 }
                 Spacer(modifier = Modifier.height(StarveilSpacing.md))
                 StarveilSegmented(

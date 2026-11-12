@@ -1,7 +1,14 @@
 package com.justnpcx.starveil.core.ui.components
 
+import android.content.res.Configuration
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,11 +18,15 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.geometry.Offset
@@ -57,9 +68,25 @@ fun StarveilCard(
     // on a #131314 page the card is already separated by value, and a shadow
     // there is invisible anyway.
     val day = !StarveilColors.isDark
+    // A press is a movement, not a shape: the card gives 2% and comes back.
+    // Only on a touch screen — a Fire TV has no finger to press with, and a
+    // D-pad focus moving the card under the cursor is the same defect the
+    // navigation bar spent two rounds removing.
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val touch = LocalConfiguration.current.touchscreen == Configuration.TOUCHSCREEN_FINGER
+    val scale by animateFloatAsState(
+        targetValue = if (onClick != null && pressed && touch) 0.98f else 1f,
+        animationSpec = tween(durationMillis = 120),
+        label = "card-press",
+    )
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .shadow(
                 elevation = if (day) 1.dp else 4.dp,
                 shape = StarveilShapes.card,
@@ -85,7 +112,12 @@ fun StarveilCard(
                 if (onClick == null) {
                     Modifier
                 } else {
-                    Modifier.clickable(role = Role.Button, onClick = onClick)
+                    Modifier.clickable(
+                        interactionSource = interaction,
+                        indication = LocalIndication.current,
+                        role = Role.Button,
+                        onClick = onClick,
+                    )
                 },
             ),
         content = content,

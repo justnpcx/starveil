@@ -34,7 +34,9 @@ import com.justnpcx.starveil.core.model.NodeHealth
 import com.justnpcx.starveil.core.model.NodeRegions
 import com.justnpcx.starveil.core.model.NodeStatus
 import com.justnpcx.starveil.core.ui.components.LatencySparkline
+import com.justnpcx.starveil.core.ui.components.NodeHealthChart
 import com.justnpcx.starveil.core.ui.components.StarveilCard
+import com.justnpcx.starveil.core.ui.components.StarveilSkeletonRow
 import com.justnpcx.starveil.core.ui.components.ChipSurface
 import com.justnpcx.starveil.core.ui.components.StarveilChip
 import com.justnpcx.starveil.core.ui.components.StarveilChipRow
@@ -155,6 +157,7 @@ import com.justnpcx.starveil.core.ui.components.MessageBanner
 import com.justnpcx.starveil.core.ui.components.rememberAppearance
 import com.justnpcx.starveil.core.ui.theme.StarveilColors
 import com.justnpcx.starveil.core.ui.theme.StarveilSpacing
+import com.justnpcx.starveil.core.ui.theme.HubTone
 import com.justnpcx.starveil.core.ui.util.readClipboardText
 import com.justnpcx.starveil.core.ui.util.writeClipboard
 
@@ -599,7 +602,13 @@ fun ProfilesScreen(
                     }
                     StarveilCard(
                         modifier = Modifier
-                            .then(if (shown.isEmpty()) Modifier else Modifier.weight(1f))
+                            .then(
+                                if (shown.isEmpty() && !state.loading) {
+                                    Modifier
+                                } else {
+                                    Modifier.weight(1f)
+                                },
+                            )
                             .padding(
                                 start = StarveilSpacing.pageMargin,
                                 end = StarveilSpacing.pageMargin,
@@ -615,6 +624,14 @@ fun ProfilesScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = StarveilSpacing.plusClearance),
                     ) {
+                    if (state.loading && shown.isEmpty()) {
+                        // The card is already on screen while the database is
+                        // being read; five row-shaped placeholders keep it from
+                        // flashing the empty-state sentence first.
+                        items(SKELETON_ROWS) { index ->
+                            StarveilSkeletonRow(showDivider = index != SKELETON_ROWS - 1)
+                        }
+                    } else {
                     itemsIndexed(shown, key = { _, profile -> profile.id }) { index, profile ->
                         // §5.2: rows settle in top-down instead of snapping in
                         // as a block. `appeared` lives out here so a row that
@@ -661,6 +678,7 @@ fun ProfilesScreen(
                                     ),
                             )
                         }
+                    }
                     }
                     if (timedOut.isNotEmpty()) {
                         item {
@@ -960,31 +978,13 @@ fun ProfilesScreen(
                     .navigationBarsPadding()
                     .verticalScroll(rememberScrollState()),
             ) {
-                Text(
-                    text = stringResource(R.string.profiles_row_menu_title, profile.name),
-                    style = StarveilType.tech,
-                    color = StarveilColors.ink2,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(
-                        start = StarveilSpacing.pageMargin,
-                        end = StarveilSpacing.pageMargin,
-                        top = StarveilSpacing.xl,
-                    ),
+                NodeDetailHeader(
+                    profile = profile,
+                    groupLabel = groupNames[profile.groupId]
+                        ?: stringResource(R.string.profiles_group_none),
+                    health = state.health[profile.id],
                 )
-                Text(
-                    text = "${profile.type.name.uppercase()} · ${profile.server}:${profile.port}",
-                    style = StarveilType.label,
-                    color = StarveilColors.ink3,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(
-                        start = StarveilSpacing.pageMargin,
-                        end = StarveilSpacing.pageMargin,
-                        top = StarveilSpacing.xs,
-                        bottom = StarveilSpacing.sm,
-                    ),
-                )
+                NodeMenuGroupSeparator()
 
                 // Operations, management, then the one destructive action.
                 // Bands separate the groups; individual rows stay text-only.
@@ -1610,7 +1610,11 @@ private fun NodeRow(
                 // that share a name are told apart by what they speak as much
                 // as by their port, and a reader should not have to open a row
                 // to find out which is which.
-                ProtocolBadge(profile.type.shortName())
+                MetaBadge(
+                    label = profile.type.shortName(),
+                    bed = profile.type.protocolTone().bg,
+                    ink = profile.type.protocolTextColor(),
+                )
                 if (disambiguator != null) {
                     Spacer(modifier = Modifier.width(StarveilSpacing.xs))
                     Text(
@@ -1730,19 +1734,157 @@ private fun NodeRow(
  * Carries a description because colour alone is not a signal for anyone using a
  * screen reader — the dot is the only place the window's verdict appears.
  */
-/** The protocol, as a small tag on the row's first line. */
+/**
+ * The top of a node's sheet: who it is, what it speaks, and how it has been.
+ *
+ * The row can only carry a name, a protocol tag and a number; the sheet is
+ * where the same node gets a face. The avatar is the protocol's family colour,
+ * the same one the row's badge uses, so the sheet is recognisably the row
+ * expanded rather than a second object.
+ */
 @Composable
-private fun ProtocolBadge(label: String) {
+private fun NodeDetailHeader(
+    profile: Profile,
+    groupLabel: String,
+    health: NodeHealth?,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = StarveilSpacing.pageMargin, vertical = StarveilSpacing.lg),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ProtocolAvatar(label = profile.type.shortName(), tone = profile.type.protocolTone())
+            Spacer(modifier = Modifier.width(StarveilSpacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = profile.displayName(),
+                    style = StarveilType.headline,
+                    color = StarveilColors.ink,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(StarveilSpacing.xs))
+                // The avatar already says the protocol; this line says which
+                // group the node belongs to, so the two facts are not printed
+                // twice in two centimetres.
+                MetaBadge(
+                    label = groupLabel,
+                    bed = StarveilColors.segBg,
+                    ink = StarveilColors.ink2,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(StarveilSpacing.md))
+        Text(
+            text = "${profile.server}:${profile.port}",
+            style = StarveilType.tech,
+            color = StarveilColors.ink2,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (health != null) {
+            Spacer(modifier = Modifier.height(StarveilSpacing.md))
+            Text(
+                text = detailHealthLine(profile, health),
+                style = StarveilType.label,
+                color = StarveilColors.ink2,
+            )
+            Spacer(modifier = Modifier.height(StarveilSpacing.sm))
+            NodeHealthChart(
+                health = health,
+                contentDescription = stringResource(
+                    R.string.profiles_detail_chart_desc,
+                    profile.displayName(),
+                ),
+                height = 88.dp,
+            )
+        }
+    }
+}
+
+/** The status and the last reading, in one line. */
+@Composable
+private fun detailHealthLine(profile: Profile, health: NodeHealth): String {
+    val status = when (health.status) {
+        NodeStatus.UP -> stringResource(R.string.profiles_status_up)
+        NodeStatus.DOWN -> stringResource(R.string.profiles_status_down)
+        NodeStatus.UNTESTED -> stringResource(R.string.profiles_status_untested)
+    }
+    val reading = when (val value = latencyReading(profile, health)) {
+        is LatencyReading.Value -> "${value.ms} ms"
+        LatencyReading.Timeout -> stringResource(R.string.profiles_latency_timeout)
+        LatencyReading.Untested -> stringResource(R.string.profiles_latency_untested)
+    }
+    return "$status · $reading"
+}
+
+/** The protocol as a 56dp tile, for the sheet's header. */
+@Composable
+private fun ProtocolAvatar(label: String, tone: HubTone) {
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(tone.bg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = StarveilType.headline.copy(fontSize = 15.sp),
+            color = StarveilColors.ink,
+            maxLines = 1,
+        )
+    }
+}
+
+/** A small metadata tag: protocol family on a row, group on a sheet. */
+@Composable
+private fun MetaBadge(label: String, bed: Color, ink: Color) {
     Text(
         text = label,
         style = StarveilType.tech.copy(fontSize = 10.sp, letterSpacing = 0.4.sp),
-        color = StarveilColors.ink2,
+        color = ink,
         maxLines = 1,
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(StarveilColors.segBg)
+            .background(bed)
             .padding(horizontal = 5.dp, vertical = 1.dp),
     )
+}
+
+/**
+ * The badge's text colour.
+ *
+ * The family's own ink is a 3:1 glyph colour; at 10sp the badge is text and
+ * needs 4.5:1. Three of the four pass as they are; the amber one uses the
+ * warning tone, which is the same hue family at a text-safe value.
+ */
+@Composable
+private fun ProfileType.protocolTextColor(): Color = when (this) {
+    ProfileType.WIREGUARD -> StarveilColors.warn
+    ProfileType.OTHER -> StarveilColors.ink2
+    else -> protocolTone().ink
+}
+
+/**
+ * A protocol's family colour.
+ *
+ * The badge is a wayfinding mark, not decoration: four families a reader can
+ * learn in one glance. The mapping is semantic rather than hashed, so adding a
+ * node never changes the colour of the nodes beside it.
+ */
+@Composable
+private fun ProfileType.protocolTone(): HubTone = when (this) {
+    // TLS-shaped proxies.
+    ProfileType.VLESS, ProfileType.VMESS, ProfileType.TROJAN -> StarveilColors.hubLogs
+    // The legacy stream-cipher family.
+    ProfileType.SHADOWSOCKS -> StarveilColors.hubScenes
+    // QUIC / UDP transports.
+    ProfileType.HYSTERIA2, ProfileType.TUIC -> StarveilColors.hubDiagnostics
+    // Everything else that is still a tunnel.
+    ProfileType.WIREGUARD -> StarveilColors.hubSettings
+    ProfileType.OTHER -> HubTone(bg = StarveilColors.segBg, ink = StarveilColors.ink2)
 }
 
 @Composable
@@ -1811,6 +1953,9 @@ internal fun latencyReading(profile: Profile, health: NodeHealth?): LatencyReadi
 
 /** §6.3 card metrics. */
 private val NODE_ROW_MIN_HEIGHT = 64.dp
+
+/** How many placeholders fill the card while the list is being read. */
+private const val SKELETON_ROWS = 5
 private val SELECTED_BORDER_WIDTH = 2.dp
 private val STATUS_DOT_SIZE = 8.dp
 private val SPARKLINE_WIDTH = 64.dp

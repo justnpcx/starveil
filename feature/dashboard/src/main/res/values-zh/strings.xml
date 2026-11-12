@@ -55,7 +55,6 @@
     <string name="dashboard_mode_auto">自动</string>
     <string name="dashboard_mode_manual">手动</string>
     <string name="dashboard_exit">出口 IP %1$s · 出口往返 %2$d ms（经节点实测）</string>
-<string name="dashboard_first_connect_hint">点按圆环连接</string>
     <string name="dashboard_hint_connect">点按连接</string>
     <string name="dashboard_hint_disconnect">点按断开</string>
     <string name="dashboard_hint_connecting">正在建立隧道</string>

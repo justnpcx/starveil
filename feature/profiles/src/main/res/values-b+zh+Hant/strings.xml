@@ -118,7 +118,6 @@
     <string name="profiles_chain_clear">清除前置</string>
     <string name="profiles_chain_no_candidates">沒有可用作前置的節點：已經帶前置的節點不能再當前置。</string>
     <string name="profiles_row_move">移到分組</string>
-    <string name="profiles_row_menu_title">%1$s</string>
     <string name="profiles_group_all">全部</string>
     <string name="profiles_search_hint">搜尋名稱或位址</string>
     <string name="profiles_search_clear">清除搜尋</string>
@@ -233,4 +232,5 @@
     <string name="profiles_delete_front_dependents">有 %1$d 個節點以它為前置，刪除後將改為直連。</string>
     <string name="profiles_share_copy_json">複製 sing-box JSON</string>
     <string name="profiles_share_json_copied">JSON 已複製</string>
+    <string name="profiles_detail_chart_desc">「%1$s」的延遲歷史。</string>
 </resources>
