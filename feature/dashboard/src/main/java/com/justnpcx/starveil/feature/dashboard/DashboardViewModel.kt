@@ -15,6 +15,7 @@ import com.justnpcx.starveil.core.kernel.KernelDiagnostics
 import com.justnpcx.starveil.core.kernel.KernelState
 import com.justnpcx.starveil.core.kernel.TrafficStats
 import com.justnpcx.starveil.core.model.NodeHealth
+import com.justnpcx.starveil.core.model.Profile
 import com.justnpcx.starveil.core.model.NodeSelectionMode
 import com.justnpcx.starveil.core.model.STICKINESS_MARGIN
 import com.justnpcx.starveil.core.model.pickerPolicySummary
@@ -41,8 +42,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+/** How many recent rows the home page draws. */
+private const val RECENT_NODE_LIMIT = 3
+
 /** One rate sample, kept for the traffic sparkline. */
 data class TrafficSample(val downlink: Long, val uplink: Long)
+
+/** A recently used node, with the health the compact row draws. */
+data class RecentNodeUi(val profile: Profile, val health: NodeHealth?)
 
 /** Single source of truth for the Dashboard screen. */
 data class DashboardUiState(
@@ -102,6 +109,9 @@ data class DashboardUiState(
 
     /** When the current or last tunnel session started; null when never. */
     val sessionStartedAt: Long? = null,
+
+    /** Up to three recently used nodes, newest first, current excluded. */
+    val recentNodes: List<RecentNodeUi> = emptyList(),
 
     /**
      * False only on an install that has never had a tunnel up. The ring's
@@ -336,6 +346,19 @@ class DashboardViewModel @Inject constructor(
      * Feed it back at full weight so a stale TCP-probe verdict cannot keep a
      * working node marked DOWN. GLOBAL_DIRECT proves nothing about the node.
      */
+    /**
+     * Remember the node this connection actually uses.
+     *
+     * A group target has no single node id, so it records nothing — the
+     * kernel's urltest picks inside the group, and the app does not pretend to
+     * know which member won.
+     */
+    private suspend fun recordSelectedNodeUse(atEpochMs: Long) {
+        val id = preferences.selectedProfileId.first()
+        if (id == 0L) return
+        profiles.getById(id)?.let { preferences.recordNodeUse(it.nodeKey, atEpochMs) }
+    }
+
     internal suspend fun recordExitReached(info: com.justnpcx.starveil.core.data.network.ExitInfo) {
         if (preferences.routePreset.first() == RoutePreset.GLOBAL_DIRECT) return
         val id = preferences.selectedProfileId.first()
@@ -410,6 +433,15 @@ class DashboardViewModel @Inject constructor(
                     // stuck on the node they just left. Off unless asked.
                     if (preferences.interruptOnNodeSwitch.first()) {
                         kernel.closeConnections()
+                    }
+                    // A switch while the tunnel is up is a use of the new
+                    // node, even though it goes through restart() rather than
+                    // connect(). Recording it here keeps the recent shelf's
+                    // order honest for hand-picked switches.
+                    if (target is ConnectionTarget.Node) {
+                        profiles.getById(target.id)?.let {
+                            preferences.recordNodeUse(it.nodeKey, System.currentTimeMillis())
+                        }
                     }
                     applyConfigChange()
                 }
@@ -504,6 +536,33 @@ class DashboardViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(lastExit = exit, sessionStartedAt = at.takeIf { it > 0 })
                 }
+            }
+        }
+
+        // The recent rows are a join of three sources: the stored uses, the
+        // nodes that still exist, and their health. A use whose node is gone
+        // simply never reaches the join, which is the silent prune the task
+        // asks for. The current node is excluded here, not in the row.
+        scope.launch {
+            combine(
+                preferences.recentNodeUses,
+                profiles.observeAll(),
+                nodeHealth.observeAll(),
+                preferences.connectionTarget,
+            ) { uses, nodes, byNode, target ->
+                val currentId = (target as? ConnectionTarget.Node)?.id
+                val byKey = nodes.associateBy { it.nodeKey }
+                val seen = mutableSetOf<String>()
+                uses.asSequence()
+                    .sortedByDescending { it.atEpochMs }
+                    .mapNotNull { use -> byKey[use.nodeKey] }
+                    .filter { it.id != currentId }
+                    .filter { seen.add(it.nodeKey) }
+                    .take(RECENT_NODE_LIMIT)
+                    .map { node -> RecentNodeUi(node, nodeHealthOf(byNode[node.id].orEmpty())) }
+                    .toList()
+            }.collect { recent ->
+                _uiState.update { it.copy(recentNodes = recent) }
             }
         }
     }
@@ -645,6 +704,19 @@ class DashboardViewModel @Inject constructor(
     }
 
     /**
+     * A recent row's tap: the same two writes the Nodes page makes.
+     *
+     * A hand pick is what "manual" means, and the target collector is what
+     * reconnects a running tunnel. This must not grow a second switch path.
+     */
+    fun selectRecentNode(id: Long) {
+        scope.launch {
+            preferences.setNodeSelectionMode(NodeSelectionMode.MANUAL)
+            preferences.setSelectedProfileId(id)
+        }
+    }
+
+    /**
      * Switch the auto/manual mode. Choosing auto picks now, so the control does
      * what it says rather than only changing a label.
      */
@@ -723,6 +795,7 @@ class DashboardViewModel @Inject constructor(
                 // The ring's first-connect hint is answered for good now.
                 preferences.markConnectedOnce()
                 preferences.recordSessionStart(startedAt)
+                recordSelectedNodeUse(startedAt)
                 startStatsLoop()
                 // The tunnel exists; whether it carries anything is a separate
                 // question, and the one the user finds out about the hard way.
@@ -929,6 +1002,7 @@ class DashboardViewModel @Inject constructor(
                 val startedAt = System.currentTimeMillis()
                 _uiState.update { it.copy(sessionStartedAt = startedAt) }
                 preferences.recordSessionStart(startedAt)
+                recordSelectedNodeUse(startedAt)
             }
             startStatsLoop()
         }

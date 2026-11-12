@@ -50,6 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.justnpcx.starveil.core.kernel.TrafficStats
 import com.justnpcx.starveil.core.model.NodeHealth
+import com.justnpcx.starveil.core.model.displayName
 import com.justnpcx.starveil.core.model.RecommendationReason
 import com.justnpcx.starveil.core.model.NodeSelectionMode
 import com.justnpcx.starveil.core.ui.components.StarveilSnackbarHost
@@ -256,6 +257,26 @@ fun DashboardScreen(
                 onOpenDetails = { exitOpen = true },
                 onRetry = viewModel::retryExitProbe,
             )
+
+            // The recent rows are content, not navigation: they fill the space
+            // under the exit card and each one is a node the app has actually
+            // used. With no history the whole group — caption included — is
+            // absent, so a first launch never shows an empty shelf.
+            if (state.recentNodes.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(StarveilSpacing.xl))
+                Text(
+                    text = stringResource(R.string.dashboard_recent_title).uppercase(),
+                    style = StarveilType.tech,
+                    color = StarveilColors.ink2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = StarveilSpacing.sm),
+                )
+                RecentNodesCard(
+                    nodes = state.recentNodes,
+                    onSelect = viewModel::selectRecentNode,
+                )
+            }
 
             // Air under the last card, sized by the tier: a tall screen can
             // afford 24dp above the bar, a short one needs the height for the
@@ -873,6 +894,62 @@ private fun CurrentNodeCard(
                 )
             }
         }
+    }
+}
+
+/** The recent rows: one card, the node list's row grammar, no new visuals. */
+@Composable
+private fun RecentNodesCard(nodes: List<RecentNodeUi>, onSelect: (Long) -> Unit) {
+    StarveilCard(modifier = Modifier.fillMaxWidth()) {
+        nodes.forEachIndexed { index, node ->
+            RecentNodeRow(node = node, onClick = { onSelect(node.profile.id) })
+            if (index != nodes.lastIndex) {
+                StarveilDivider(startInset = StarveilSpacing.lg)
+            }
+        }
+    }
+}
+
+/**
+ * One recent node: flag and name, then the same latency/availability line the
+ * node card uses. The row selects; it does not navigate, so there is no
+ * chevron to promise a page that does not exist.
+ */
+@Composable
+private fun RecentNodeRow(node: RecentNodeUi, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 64.dp)
+            .padding(horizontal = StarveilSpacing.lg, vertical = StarveilSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            NodeName(name = node.profile.displayName())
+            Spacer(modifier = Modifier.height(StarveilSpacing.xs))
+            Text(
+                text = recentHealthText(node.health),
+                style = StarveilType.label,
+                color = StarveilColors.ink2,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun recentHealthText(health: NodeHealth?): String {
+    val ema = health?.emaMs
+    return if (ema == null) {
+        stringResource(R.string.dashboard_recent_untested)
+    } else {
+        stringResource(
+            R.string.dashboard_recent_health,
+            ema,
+            health.availabilityPct.roundToInt(),
+        )
     }
 }
 

@@ -2,6 +2,7 @@ package com.justnpcx.starveil.feature.dashboard
 
 import com.justnpcx.starveil.core.data.preferences.ConnectionTarget
 import com.justnpcx.starveil.core.data.preferences.ExitSnapshot
+import com.justnpcx.starveil.core.data.preferences.RecentNodeUse
 import com.justnpcx.starveil.core.data.network.ExitInfo
 import com.justnpcx.starveil.core.data.log.AppLogSink
 import com.justnpcx.starveil.core.data.network.ExitProbe
@@ -808,6 +809,87 @@ class DashboardViewModelTest {
         assertEquals("203.0.113.9", viewModel.uiState.value.lastExit?.address)
     }
 
+    @Test
+    fun `recent rows exclude the current node and keep the newest three`() = runBlocking {
+        val a = profile(ONE, "one")
+        val b = profile(TWO, "two")
+        val c = profile(THREE, "three")
+        val preferences = FakePreferences(ONE)
+        preferences.storeRecentUses(
+            listOf(
+                RecentNodeUse(a.nodeKey, 300),
+                RecentNodeUse(b.nodeKey, 200),
+                RecentNodeUse(c.nodeKey, 100),
+            ),
+        )
+
+        val viewModel = viewModel(preferences, RecordingKernel(), nodes = listOf(a, b, c))
+        yield()
+
+        // ONE is current, so the shelf is the other two in use order.
+        assertEquals(
+            listOf("two", "three"),
+            viewModel.uiState.value.recentNodes.map { it.profile.name },
+        )
+    }
+
+    @Test
+    fun `tapping a recent node makes it current and drops it from the shelf`() = runBlocking {
+        val a = profile(ONE, "one")
+        val b = profile(TWO, "two")
+        val c = profile(THREE, "three")
+        val preferences = FakePreferences(ONE)
+        preferences.storeRecentUses(
+            listOf(
+                RecentNodeUse(a.nodeKey, 300),
+                RecentNodeUse(b.nodeKey, 200),
+                RecentNodeUse(c.nodeKey, 100),
+            ),
+        )
+        val viewModel = viewModel(preferences, RecordingKernel(), nodes = listOf(a, b, c))
+        yield()
+
+        viewModel.selectRecentNode(TWO)
+        yield()
+
+        assertEquals(TWO, preferences.selectedProfileId.first())
+        assertEquals(
+            listOf("one", "three"),
+            viewModel.uiState.value.recentNodes.map { it.profile.name },
+        )
+    }
+
+    @Test
+    fun `connecting records the node as recently used`() = runBlocking {
+        val preferences = FakePreferences(ONE)
+        val viewModel = viewModel(preferences, RecordingKernel())
+
+        viewModel.onCoreClick()
+        yield()
+
+        assertEquals(
+            listOf(profile(ONE, "one").nodeKey),
+            preferences.storedRecentUses.map { it.nodeKey },
+        )
+    }
+
+    @Test
+    fun `a use whose node is gone never reaches the shelf`() = runBlocking {
+        val preferences = FakePreferences(ONE)
+        preferences.storeRecentUses(
+            listOf(RecentNodeUse("VLESS|gone.example|443|gone", 100)),
+        )
+
+        val viewModel = viewModel(
+            preferences,
+            RecordingKernel(),
+            nodes = listOf(profile(ONE, "one"), profile(TWO, "two")),
+        )
+        yield()
+
+        assertTrue(viewModel.uiState.value.recentNodes.isEmpty())
+    }
+
     /** The exit probe is a network call; the tests here are not about it. */
     private object NoExit : ExitProbe(AppLogSink()) {
         override suspend fun probe(): ExitInfo? = null
@@ -891,6 +973,7 @@ class DashboardViewModelTest {
     private companion object {
         const val ONE = 1L
         const val TWO = 2L
+        const val THREE = 3L
         const val GROUP_ID = 9L
 
         /** Not in the fake node list — a node a refresh replaced. */
@@ -921,6 +1004,7 @@ private class FakePreferences(
     )
     private val lastExitFlow = MutableStateFlow<ExitSnapshot?>(null)
     private val sessionStartFlow = MutableStateFlow(0L)
+    private val recentUsesFlow = MutableStateFlow<List<RecentNodeUse>>(emptyList())
 
     override val lastExit: Flow<ExitSnapshot?> = lastExitFlow
     override suspend fun recordLastExit(address: String, rttMs: Long) {
@@ -933,6 +1017,19 @@ private class FakePreferences(
         sessionStartFlow.value = atEpochMs
         wrote()
     }
+
+    override val recentNodeUses: Flow<List<RecentNodeUse>> = recentUsesFlow
+    override suspend fun recordNodeUse(nodeKey: String, atEpochMs: Long) {
+        recentUsesFlow.value = (recentUsesFlow.value.filterNot { it.nodeKey == nodeKey } +
+            RecentNodeUse(nodeKey, atEpochMs)).sortedByDescending { it.atEpochMs }
+        wrote()
+    }
+
+    fun storeRecentUses(uses: List<RecentNodeUse>) {
+        recentUsesFlow.value = uses
+    }
+
+    val storedRecentUses: List<RecentNodeUse> get() = recentUsesFlow.value
 
     fun storeLastExit(snapshot: ExitSnapshot) {
         lastExitFlow.value = snapshot

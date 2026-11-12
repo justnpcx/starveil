@@ -88,4 +88,7 @@
     <string name="dashboard_exit_session_date">Started %1$s · ongoing</string>
     <string name="dashboard_exit_last_today">Last session today %1$s</string>
     <string name="dashboard_exit_last_date">Last session %1$s</string>
+    <string name="dashboard_recent_title">Recent</string>
+    <string name="dashboard_recent_health">%1$d ms · online %2$d%%</string>
+    <string name="dashboard_recent_untested">Not measured</string>
 </resources>

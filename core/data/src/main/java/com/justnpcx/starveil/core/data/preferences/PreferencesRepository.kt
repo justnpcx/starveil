@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.justnpcx.starveil.core.model.AppRoute
 import com.justnpcx.starveil.core.model.KillSwitchMode
@@ -55,6 +56,15 @@ sealed interface ConnectionTarget {
  * that has not answered yet.
  */
 data class ExitSnapshot(val address: String, val rttMs: Long)
+
+/**
+ * One node the app has actually connected to.
+ *
+ * [nodeKey] is the business key, not the row id: a subscription refresh
+ * replaces a group's rows and their ids, and the history has to survive that.
+ * An entry whose key no longer resolves is dropped by the reader.
+ */
+data class RecentNodeUse(val nodeKey: String, val atEpochMs: Long)
 
 private val Context.starveilDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "starveil_preferences",
@@ -235,6 +245,13 @@ interface PreferencesRepository {
 
     /** Record the start of a tunnel session, so the card can show it later. */
     suspend fun recordSessionStart(atEpochMs: Long) = Unit
+
+    /** Nodes the app has connected to, newest first. */
+    val recentNodeUses: Flow<List<RecentNodeUse>> get() =
+        kotlinx.coroutines.flow.flowOf(emptyList())
+
+    /** Record that a node was actually used, moving it to the front. */
+    suspend fun recordNodeUse(nodeKey: String, atEpochMs: Long) = Unit
 
     /**
      * True once a tunnel has actually come up on this install.
@@ -436,6 +453,7 @@ class DataStorePreferencesRepository @Inject constructor(
         val LAST_EXIT_ADDRESS = stringPreferencesKey("last_exit_address")
         val LAST_EXIT_RTT_MS = longPreferencesKey("last_exit_rtt_ms")
         val LAST_SESSION_STARTED_AT = longPreferencesKey("last_session_started_at")
+        val RECENT_NODE_USES = stringSetPreferencesKey("recent_node_uses")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val NODE_SELECTION_MODE = stringPreferencesKey("node_selection_mode")
     }
@@ -548,6 +566,19 @@ class DataStorePreferencesRepository @Inject constructor(
 
     override suspend fun recordSessionStart(atEpochMs: Long) {
         dataStore.edit { it[Keys.LAST_SESSION_STARTED_AT] = atEpochMs }
+    }
+
+    override val recentNodeUses: Flow<List<RecentNodeUse>> = dataStore.data
+        .catch { if (it is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw it }
+        .map { prefs -> decodeRecentNodeUses(prefs[Keys.RECENT_NODE_USES]) }
+
+    override suspend fun recordNodeUse(nodeKey: String, atEpochMs: Long) {
+        if (nodeKey.isEmpty()) return
+        dataStore.edit { prefs ->
+            val current = decodeRecentNodeUses(prefs[Keys.RECENT_NODE_USES])
+            val next = mergeRecentNodeUse(current, nodeKey, atEpochMs)
+            prefs[Keys.RECENT_NODE_USES] = next.map(::encodeRecentNodeUse).toSet()
+        }
     }
 
     override suspend fun setBypassMainland(enabled: Boolean) {
@@ -810,3 +841,32 @@ private fun parseUsage(raw: String?): Map<Long, com.justnpcx.starveil.core.model
     }
     return out
 }
+
+/** How many uses are kept; the card only ever draws three. */
+private const val MAX_RECENT_NODE_USES = 20
+
+/** One set entry: timestamp first, so the node key may contain anything. */
+internal fun encodeRecentNodeUse(use: RecentNodeUse): String =
+    "${use.atEpochMs}|${use.nodeKey}"
+
+/** Newest first; malformed entries are dropped rather than crashing a read. */
+internal fun decodeRecentNodeUses(entries: Set<String>?): List<RecentNodeUse> =
+    entries.orEmpty().mapNotNull { entry ->
+        val at = entry.substringBefore('|').toLongOrNull() ?: return@mapNotNull null
+        val key = entry.substringAfter('|', missingDelimiterValue = "")
+        if (key.isEmpty()) null else RecentNodeUse(key, at)
+    }.sortedByDescending { it.atEpochMs }
+
+/**
+ * Record one use: the same node moves to the front instead of appearing twice,
+ * and the list stays bounded.
+ */
+internal fun mergeRecentNodeUse(
+    current: List<RecentNodeUse>,
+    nodeKey: String,
+    atEpochMs: Long,
+    limit: Int = MAX_RECENT_NODE_USES,
+): List<RecentNodeUse> =
+    (current.filterNot { it.nodeKey == nodeKey } + RecentNodeUse(nodeKey, atEpochMs))
+        .sortedByDescending { it.atEpochMs }
+        .take(limit)
