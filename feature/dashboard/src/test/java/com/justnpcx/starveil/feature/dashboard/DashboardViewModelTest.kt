@@ -1,6 +1,7 @@
 package com.justnpcx.starveil.feature.dashboard
 
 import com.justnpcx.starveil.core.data.preferences.ConnectionTarget
+import com.justnpcx.starveil.core.data.preferences.ExitSnapshot
 import com.justnpcx.starveil.core.data.network.ExitInfo
 import com.justnpcx.starveil.core.data.log.AppLogSink
 import com.justnpcx.starveil.core.data.network.ExitProbe
@@ -749,6 +750,64 @@ class DashboardViewModelTest {
         assertNull(viewModel.uiState.value.exitSmoothedRttMs)
     }
 
+    @Test
+    fun `a stored exit and session survive a new view model`() = runBlocking {
+        val preferences = FakePreferences(ONE)
+        preferences.storeLastExit(ExitSnapshot("203.0.113.8", 42))
+        preferences.storeSessionStart(1_700_000_000_000L)
+
+        val viewModel = viewModel(preferences, RecordingKernel())
+        yield()
+
+        assertEquals(ExitSnapshot("203.0.113.8", 42), viewModel.uiState.value.lastExit)
+        assertEquals(1_700_000_000_000L, viewModel.uiState.value.sessionStartedAt)
+    }
+
+    @Test
+    fun `connecting records the session start`() = runBlocking {
+        val preferences = FakePreferences(ONE)
+        val viewModel = viewModel(preferences, RecordingKernel())
+
+        viewModel.onCoreClick()
+        yield()
+
+        assertTrue(preferences.storedSessionStart > 0L)
+        assertEquals(preferences.storedSessionStart, viewModel.uiState.value.sessionStartedAt)
+    }
+
+    @Test
+    fun `a successful probe stores the exit for the disconnected card`() = runBlocking {
+        val probe = object : ExitProbe(AppLogSink()) {
+            override suspend fun probe(): ExitInfo? = ExitInfo("203.0.113.9", 42, 1_000L)
+        }
+        val preferences = FakePreferences(ONE)
+        val viewModel = viewModel(preferences, RecordingKernel(), exitProbe = probe)
+
+        viewModel.onCoreClick()
+        yield()
+
+        assertEquals(ExitSnapshot("203.0.113.9", 42), preferences.storedLastExit)
+        assertEquals(ExitSnapshot("203.0.113.9", 42), viewModel.uiState.value.lastExit)
+    }
+
+    @Test
+    fun `disconnecting keeps the last exit but clears the live one`() = runBlocking {
+        val probe = object : ExitProbe(AppLogSink()) {
+            override suspend fun probe(): ExitInfo? = ExitInfo("203.0.113.9", 42, 1_000L)
+        }
+        val viewModel = viewModel(FakePreferences(ONE), RecordingKernel(), exitProbe = probe)
+
+        viewModel.onCoreClick()
+        yield()
+        assertNotNull(viewModel.uiState.value.exit)
+
+        viewModel.onCoreClick()
+        yield()
+
+        assertNull(viewModel.uiState.value.exit)
+        assertEquals("203.0.113.9", viewModel.uiState.value.lastExit?.address)
+    }
+
     /** The exit probe is a network call; the tests here are not about it. */
     private object NoExit : ExitProbe(AppLogSink()) {
         override suspend fun probe(): ExitInfo? = null
@@ -860,6 +919,31 @@ private class FakePreferences(
     private val target = MutableStateFlow<ConnectionTarget>(
         if (initialId != 0L) ConnectionTarget.Node(initialId) else ConnectionTarget.None,
     )
+    private val lastExitFlow = MutableStateFlow<ExitSnapshot?>(null)
+    private val sessionStartFlow = MutableStateFlow(0L)
+
+    override val lastExit: Flow<ExitSnapshot?> = lastExitFlow
+    override suspend fun recordLastExit(address: String, rttMs: Long) {
+        lastExitFlow.value = ExitSnapshot(address, rttMs)
+        wrote()
+    }
+
+    override val lastSessionStartedAt: Flow<Long> = sessionStartFlow
+    override suspend fun recordSessionStart(atEpochMs: Long) {
+        sessionStartFlow.value = atEpochMs
+        wrote()
+    }
+
+    fun storeLastExit(snapshot: ExitSnapshot) {
+        lastExitFlow.value = snapshot
+    }
+
+    fun storeSessionStart(atEpochMs: Long) {
+        sessionStartFlow.value = atEpochMs
+    }
+
+    val storedLastExit: ExitSnapshot? get() = lastExitFlow.value
+    val storedSessionStart: Long get() = sessionStartFlow.value
 
     /**
      * Bumped by every write. DataStore re-reads the whole file on any edit, so

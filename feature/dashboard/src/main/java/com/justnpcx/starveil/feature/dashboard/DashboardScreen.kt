@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -63,6 +64,10 @@ import com.justnpcx.starveil.core.ui.components.StarveilDivider
 import com.justnpcx.starveil.core.ui.theme.StarveilColors
 import com.justnpcx.starveil.core.ui.theme.StarveilSpacing
 import com.justnpcx.starveil.core.ui.theme.StarveilType
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.round
 import kotlin.math.roundToInt
@@ -241,75 +246,16 @@ fun DashboardScreen(
                 padding = metrics.cardPadding,
             )
 
-            // Where the traffic appears to come from, and how long the round
-            // trip to a third party took. Always visible while connected: a
-            // proxy that silently fell back to the local connection looks
-            // exactly like one that works until this line says so.
-            // Connected but nothing answered is its own state, not a blank:
-            // the card says the measurement failed and takes a tap to retry.
-            // It is deliberately not the disconnected line — one is a verdict
-            // about a running tunnel, the other is a leftover.
-            val exitLive = state.connectionState == ConnectionState.CONNECTED ||
-                state.connectionState == ConnectionState.WARNING
-            val exit = state.exit
-            if (exitLive && exit == null && state.exitProbeFailed) {
-                Spacer(modifier = Modifier.height(StarveilSpacing.md))
-                StarveilCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = viewModel::retryExitProbe,
-                ) {
-                    Text(
-                        text = stringResource(R.string.dashboard_exit_unmeasured),
-                        style = StarveilType.label,
-                        color = StarveilColors.ink2,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = StarveilSpacing.lg,
-                                vertical = StarveilSpacing.md,
-                            ),
-                    )
-                }
-            }
-            if (exit != null) {
-                Spacer(modifier = Modifier.height(StarveilSpacing.md))
-                if (exitLive) {
-                    StarveilCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { exitOpen = true },
-                    ) {
-                        ExitRow(
-                            label = stringResource(R.string.dashboard_exit_address),
-                            value = exit.address,
-                        )
-                        StarveilDivider(startInset = StarveilSpacing.lg)
-                        ExitRow(
-                            label = stringResource(R.string.dashboard_exit_rtt_smoothed),
-                            value = stringResource(
-                                R.string.dashboard_exit_rtt_value,
-                                state.exitSmoothedRttMs ?: exit.rttMs,
-                            ),
-                        )
-                    }
-                } else {
-                    // The tunnel is down, so this is no longer a live reading.
-                    // The card stops being a card: one grey line that says what
-                    // the number is, with no latency row and nothing to tap.
-                    StarveilCard(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = stringResource(R.string.dashboard_exit_last, exit.address),
-                            style = StarveilType.label,
-                            color = StarveilColors.ink3,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    horizontal = StarveilSpacing.lg,
-                                    vertical = StarveilSpacing.md,
-                                ),
-                        )
-                    }
-                }
-            }
+            // The exit card is permanent: three rows, one height, in both
+            // states. The values change; the card does not move, so the
+            // recent-node section below it keeps its position across a
+            // connect/disconnect.
+            Spacer(modifier = Modifier.height(StarveilSpacing.md))
+            ExitCard(
+                state = state,
+                onOpenDetails = { exitOpen = true },
+                onRetry = viewModel::retryExitProbe,
+            )
 
             // Air under the last card, sized by the tier: a tall screen can
             // afford 24dp above the bar, a short one needs the height for the
@@ -483,9 +429,144 @@ private fun ExitDetailsDialog(
     )
 }
 
+/** Which of the exit card's five states is in force. */
+internal enum class ExitCardMode { LIVE, NOT_MEASURED, FAILED, LAST, NONE }
+
+/**
+ * The matrix, as one function.
+ *
+ * A live measurement is always the answer. A running tunnel with no answer is
+ * either still asking or has failed — two different verdicts. A stopped tunnel
+ * shows the last snapshot; with no snapshot it says so.
+ */
+internal fun exitCardMode(
+    connected: Boolean,
+    hasLive: Boolean,
+    probeFailed: Boolean,
+    hasLast: Boolean,
+): ExitCardMode = when {
+    connected && hasLive -> ExitCardMode.LIVE
+    connected && probeFailed -> ExitCardMode.FAILED
+    connected -> ExitCardMode.NOT_MEASURED
+    hasLast -> ExitCardMode.LAST
+    else -> ExitCardMode.NONE
+}
+
+/**
+ * The exit, in both states, at one height.
+ *
+ * Three rows always: the address, the round trip, and the session clock. The
+ * disconnected card is the last session's snapshot in secondary ink, not a
+ * dimmed card. A connected session with no answer yet is its own row text —
+ * "not measured" and "probe failed" are different verdicts, and neither one
+ * may borrow the previous session's value.
+ */
+@Composable
+private fun ExitCard(
+    state: DashboardUiState,
+    onOpenDetails: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    val connected = state.connectionState == ConnectionState.CONNECTED ||
+        state.connectionState == ConnectionState.WARNING
+    val live = state.exit
+    val last = state.lastExit
+    val mode = exitCardMode(
+        connected = connected,
+        hasLive = live != null,
+        probeFailed = state.exitProbeFailed,
+        hasLast = last != null,
+    )
+    val muted = mode == ExitCardMode.LAST || mode == ExitCardMode.NONE
+    val noRecord = stringResource(R.string.dashboard_exit_no_record)
+    val ip = when (mode) {
+        ExitCardMode.LIVE -> live?.address ?: noRecord
+        ExitCardMode.NOT_MEASURED -> stringResource(R.string.dashboard_exit_unmeasured)
+        ExitCardMode.FAILED -> stringResource(R.string.dashboard_exit_probe_failed)
+        ExitCardMode.LAST -> last?.address ?: noRecord
+        ExitCardMode.NONE -> noRecord
+    }
+    val rtt = when (mode) {
+        ExitCardMode.LIVE -> stringResource(
+            R.string.dashboard_exit_rtt_value,
+            state.exitSmoothedRttMs ?: live?.rttMs ?: 0L,
+        )
+        ExitCardMode.NOT_MEASURED -> stringResource(R.string.dashboard_exit_unmeasured)
+        ExitCardMode.FAILED -> stringResource(R.string.dashboard_exit_probe_failed)
+        ExitCardMode.LAST -> stringResource(
+            R.string.dashboard_exit_rtt_value,
+            last?.rttMs ?: 0L,
+        )
+        ExitCardMode.NONE -> noRecord
+    }
+    val startedAt = state.sessionStartedAt
+    val time = when {
+        mode == ExitCardMode.LIVE ||
+            mode == ExitCardMode.NOT_MEASURED ||
+            mode == ExitCardMode.FAILED ->
+            if (startedAt != null) sessionStartedText(startedAt) else noRecord
+        startedAt != null -> lastSessionText(startedAt)
+        else -> noRecord
+    }
+    StarveilCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = when {
+            connected && live == null -> onRetry
+            connected -> onOpenDetails
+            else -> null
+        },
+    ) {
+        ExitRow(stringResource(R.string.dashboard_exit_address), ip, muted)
+        StarveilDivider(startInset = StarveilSpacing.lg)
+        ExitRow(stringResource(R.string.dashboard_exit_rtt_smoothed), rtt, muted)
+        StarveilDivider(startInset = StarveilSpacing.lg)
+        ExitRow(stringResource(R.string.dashboard_exit_time), time, muted)
+    }
+}
+
+@Composable
+private fun sessionStartedText(atEpochMs: Long): String {
+    val clock = sessionClock(atEpochMs)
+    return stringResource(
+        if (clock.today) {
+            R.string.dashboard_exit_session_today
+        } else {
+            R.string.dashboard_exit_session_date
+        },
+        clock.text,
+    )
+}
+
+@Composable
+private fun lastSessionText(atEpochMs: Long): String {
+    val clock = sessionClock(atEpochMs)
+    return stringResource(
+        if (clock.today) {
+            R.string.dashboard_exit_last_today
+        } else {
+            R.string.dashboard_exit_last_date
+        },
+        clock.text,
+    )
+}
+
+private data class SessionClock(val today: Boolean, val text: String)
+
+/** Today is "HH:mm"; any other day keeps the date. */
+private fun sessionClock(atEpochMs: Long): SessionClock {
+    val zone = ZoneId.systemDefault()
+    val time = Instant.ofEpochMilli(atEpochMs).atZone(zone)
+    val today = time.toLocalDate() == LocalDate.now(zone)
+    val pattern = if (today) "HH:mm" else "MM-dd HH:mm"
+    return SessionClock(
+        today = today,
+        text = time.format(DateTimeFormatter.ofPattern(pattern, Locale.getDefault())),
+    )
+}
+
 /** One labelled fact on the exit card: the name on the left, the value right. */
 @Composable
-private fun ExitRow(label: String, value: String) {
+private fun ExitRow(label: String, value: String, muted: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -496,14 +577,19 @@ private fun ExitRow(label: String, value: String) {
             text = label,
             style = StarveilType.label,
             color = StarveilColors.ink2,
-            modifier = Modifier.weight(1f),
+            maxLines = 1,
         )
         Spacer(modifier = Modifier.width(StarveilSpacing.md))
         Text(
             text = value,
             style = StarveilType.tech,
-            color = StarveilColors.ink,
+            // Grey is the text's colour, not the card's opacity: a 45% card
+            // fade made the latency unreadable on device.
+            color = if (muted) StarveilColors.ink2 else StarveilColors.ink,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
         )
     }
 }

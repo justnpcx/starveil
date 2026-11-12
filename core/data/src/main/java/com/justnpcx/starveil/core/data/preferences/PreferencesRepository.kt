@@ -46,6 +46,16 @@ sealed interface ConnectionTarget {
     data class Group(val id: Long) : ConnectionTarget
 }
 
+/**
+ * The last successful exit measurement.
+ *
+ * Kept across launches so the exit card can show what the last session saw
+ * while the tunnel is down. It is a session fact, not a live reading: the card
+ * greys it out when it is not current, and never lets it stand in for a probe
+ * that has not answered yet.
+ */
+data class ExitSnapshot(val address: String, val rttMs: Long)
+
 private val Context.starveilDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "starveil_preferences",
 )
@@ -213,6 +223,18 @@ interface PreferencesRepository {
 
     /** Last leak self-check (minimal M2 version). */
     val lastLeakCheck: Flow<LeakCheckRecord>
+
+    /** The last successful exit measurement, or null when none is stored. */
+    val lastExit: Flow<ExitSnapshot?> get() = kotlinx.coroutines.flow.flowOf(null)
+
+    /** Keep a successful exit measurement for the disconnected card. */
+    suspend fun recordLastExit(address: String, rttMs: Long) = Unit
+
+    /** When the current or last tunnel session started; 0 when never. */
+    val lastSessionStartedAt: Flow<Long> get() = kotlinx.coroutines.flow.flowOf(0L)
+
+    /** Record the start of a tunnel session, so the card can show it later. */
+    suspend fun recordSessionStart(atEpochMs: Long) = Unit
 
     /**
      * True once a tunnel has actually come up on this install.
@@ -411,6 +433,9 @@ class DataStorePreferencesRepository @Inject constructor(
         val MANUAL_PRESET_AT = longPreferencesKey("manual_preset_at")
         val HAS_CONNECTED_ONCE = booleanPreferencesKey("has_connected_once")
         val NODE_HINT_SEEN = booleanPreferencesKey("node_hint_seen")
+        val LAST_EXIT_ADDRESS = stringPreferencesKey("last_exit_address")
+        val LAST_EXIT_RTT_MS = longPreferencesKey("last_exit_rtt_ms")
+        val LAST_SESSION_STARTED_AT = longPreferencesKey("last_session_started_at")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val NODE_SELECTION_MODE = stringPreferencesKey("node_selection_mode")
     }
@@ -497,6 +522,33 @@ class DataStorePreferencesRepository @Inject constructor(
                 leaking = prefs[Keys.LEAK_CHECK_LEAKING] ?: false,
             )
         }
+
+    override val lastExit: Flow<ExitSnapshot?> = dataStore.data
+        .catch { if (it is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw it }
+        .map { prefs ->
+            val address = prefs[Keys.LAST_EXIT_ADDRESS]
+            val rtt = prefs[Keys.LAST_EXIT_RTT_MS]
+            if (address.isNullOrBlank() || rtt == null || rtt < 0) {
+                null
+            } else {
+                ExitSnapshot(address, rtt)
+            }
+        }
+
+    override suspend fun recordLastExit(address: String, rttMs: Long) {
+        dataStore.edit {
+            it[Keys.LAST_EXIT_ADDRESS] = address
+            it[Keys.LAST_EXIT_RTT_MS] = rttMs
+        }
+    }
+
+    override val lastSessionStartedAt: Flow<Long> = dataStore.data
+        .catch { if (it is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw it }
+        .map { prefs -> prefs[Keys.LAST_SESSION_STARTED_AT] ?: 0L }
+
+    override suspend fun recordSessionStart(atEpochMs: Long) {
+        dataStore.edit { it[Keys.LAST_SESSION_STARTED_AT] = atEpochMs }
+    }
 
     override suspend fun setBypassMainland(enabled: Boolean) {
         dataStore.edit { it[Keys.BYPASS_MAINLAND] = enabled }

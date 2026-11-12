@@ -3,6 +3,7 @@ package com.justnpcx.starveil.feature.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justnpcx.starveil.core.data.preferences.ConnectionTarget
+import com.justnpcx.starveil.core.data.preferences.ExitSnapshot
 import com.justnpcx.starveil.core.data.preferences.PreferencesRepository
 import com.justnpcx.starveil.core.data.repository.GroupRepository
 import com.justnpcx.starveil.core.data.repository.NodeHealthRepository
@@ -89,6 +90,18 @@ data class DashboardUiState(
      * the 0.9.20 gap, where a probe that always failed simply drew nothing.
      */
     val exitProbeFailed: Boolean = false,
+
+    /**
+     * The last successful exit measurement, kept across launches.
+     *
+     * The exit card is permanent: when the tunnel is down this is what the
+     * card shows, greyed. It is never used to fill a live row — a connected
+     * session with no answer yet says "not measured" instead.
+     */
+    val lastExit: ExitSnapshot? = null,
+
+    /** When the current or last tunnel session started; null when never. */
+    val sessionStartedAt: Long? = null,
 
     /**
      * False only on an install that has never had a tunnel up. The ring's
@@ -262,17 +275,22 @@ class DashboardViewModel @Inject constructor(
                 if (_uiState.value.connectionState == ConnectionState.CONNECTED) {
                     val info = exitProbe.probe()
                     if (info != null) {
+                        val smoothed = smoothRtt(
+                            previous = _uiState.value.exitSmoothedRttMs,
+                            sample = info.rttMs,
+                        )
                         _uiState.update { state ->
                             state.copy(
                                 exit = info,
-                                exitSmoothedRttMs = smoothRtt(
-                                    previous = state.exitSmoothedRttMs,
-                                    sample = info.rttMs,
-                                ),
+                                exitSmoothedRttMs = smoothed,
                                 exitProbeFailed = false,
                             )
                         }
                         recordExitReached(info)
+                        // The same measurement is what the next launch shows
+                        // while disconnected; storing it here keeps the card
+                        // permanent without a second probe path.
+                        preferences.recordLastExit(info.address, smoothed)
                     } else {
                         // The chain ran and nothing answered. The old value is
                         // not a reading of this tunnel any more, so it goes —
@@ -476,6 +494,18 @@ class DashboardViewModel @Inject constructor(
                 _uiState.update { it.copy(everConnected = ever) }
             }
         }
+        // The exit card is permanent: the last session's measurement is read
+        // before this one has an answer, and the session clock survives a
+        // restart.
+        scope.launch {
+            combine(preferences.lastExit, preferences.lastSessionStartedAt) { exit, at ->
+                exit to at
+            }.collect { (exit, at) ->
+                _uiState.update {
+                    it.copy(lastExit = exit, sessionStartedAt = at.takeIf { it > 0 })
+                }
+            }
+        }
     }
 
     /**
@@ -676,6 +706,7 @@ class DashboardViewModel @Inject constructor(
         // outcome onto what the screen says.
         when (val outcome = connection.connect()) {
             is ConnectionOutcome.Connected -> {
+                val startedAt = System.currentTimeMillis()
                 _uiState.update {
                     it.copy(
                         isBusy = false,
@@ -686,10 +717,12 @@ class DashboardViewModel @Inject constructor(
                         // lets a caller's notice survive: it used to be cleared
                         // on the next line, which also hid this.
                         notice = null,
+                        sessionStartedAt = startedAt,
                     )
                 }
                 // The ring's first-connect hint is answered for good now.
                 preferences.markConnectedOnce()
+                preferences.recordSessionStart(startedAt)
                 startStatsLoop()
                 // The tunnel exists; whether it carries anything is a separate
                 // question, and the one the user finds out about the hard way.
@@ -784,6 +817,11 @@ class DashboardViewModel @Inject constructor(
                 },
                 stats = TrafficStats(),
                 history = emptyList(),
+                // A tunnel that is down has no live exit. The last snapshot
+                // stays in lastExit for the card's grey state.
+                exit = null,
+                exitSmoothedRttMs = null,
+                exitProbeFailed = false,
                 notice = when {
                     blocked -> DashboardNotice.KillSwitchBlocking
                     blockFailed -> DashboardNotice.KillSwitchFailed
@@ -882,7 +920,18 @@ class DashboardViewModel @Inject constructor(
                 notice = if (blocked) DashboardNotice.KillSwitchBlocking else null,
             )
         }
-        if (!blocked) startStatsLoop()
+        if (!blocked) {
+            // The kernel may have been started by the tile or the notification;
+            // this is still a session, and the card's time row needs its start.
+            // A stored start means the app was restarted while the tunnel kept
+            // running — that is the same session, so it is not reset.
+            if (_uiState.value.sessionStartedAt == null) {
+                val startedAt = System.currentTimeMillis()
+                _uiState.update { it.copy(sessionStartedAt = startedAt) }
+                preferences.recordSessionStart(startedAt)
+            }
+            startStatsLoop()
+        }
     }
 
     /**
@@ -913,6 +962,9 @@ class DashboardViewModel @Inject constructor(
                 },
                 stats = TrafficStats(),
                 history = emptyList(),
+                exit = null,
+                exitSmoothedRttMs = null,
+                exitProbeFailed = false,
             )
         }
     }

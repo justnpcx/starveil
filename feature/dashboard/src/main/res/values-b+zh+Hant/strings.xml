@@ -54,7 +54,6 @@
     <string name="dashboard_notice_kernel_refused_reason">核心啟動失敗：%1$s</string>
     <string name="dashboard_mode_auto">自動</string>
     <string name="dashboard_mode_manual">手動</string>
-    <string name="dashboard_exit">出口 IP %1$s · 出口往返 %2$d ms（經節點實測）</string>
     <string name="dashboard_hint_connect">點按連線</string>
     <string name="dashboard_hint_disconnect">點按斷開</string>
     <string name="dashboard_hint_connecting">正在建立隧道</string>
@@ -69,11 +68,17 @@
     <string name="dashboard_exit_details_title">出口</string>
     <string name="dashboard_exit_address">出口 IP</string>
     <string name="dashboard_exit_rtt_smoothed">出口延遲</string>
-    <string name="dashboard_exit_last">上次出口 %1$s</string>
     <string name="dashboard_exit_unmeasured">出口未測得 · 點按重試</string>
     <string name="dashboard_exit_rtt">往返延遲</string>
     <string name="dashboard_exit_rtt_value">%1$d ms</string>
     <string name="dashboard_exit_measured">偵測時間</string>
     <string name="dashboard_exit_note">往返延遲包含一次第三方請求的 DNS、連線與 TLS 耗時，不是 ping。</string>
 
+    <string name="dashboard_exit_time">時間</string>
+    <string name="dashboard_exit_probe_failed">探測失敗 · 點按重試</string>
+    <string name="dashboard_exit_no_record">暫無記錄</string>
+    <string name="dashboard_exit_session_today">今天 %1$s 開始 · 進行中</string>
+    <string name="dashboard_exit_session_date">%1$s 開始 · 進行中</string>
+    <string name="dashboard_exit_last_today">上次會話 今天 %1$s</string>
+    <string name="dashboard_exit_last_date">上次會話 %1$s</string>
 </resources>
