@@ -8,6 +8,17 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.27] — 2026-11-12
+
+### Added
+
+- **Home shortcuts.** The home page ended at the node card and left the lower
+  half of a tall phone blank. One card under it now carries the four
+  destinations the bottom bar does not list — scenes, diagnostics, logs and
+  settings — drawn in the hub's own tone beds, so the two pages share one icon
+  grammar. Each tile opens the same route the hub uses; the home page still
+  owns no navigation of its own.
+
 ## [0.9.26] — 2026-11-05
 
 ### Changed
