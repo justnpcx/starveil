@@ -8,6 +8,29 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.28] — 2026-11-12
+
+### Changed
+
+- **Home copy and page material.** The ring's state is Title Case and one line
+  ("Disconnected"), and the line under it no longer repeats the ring's own
+  "Tap to connect". The three background blooms are fainter and stay round on
+  a tall screen, and the node card no longer draws a diagonal weave — on a
+  phone it read as a smudge rather than as material.
+- **Protocol tags carry a family colour.** TLS proxies are blue, Shadowsocks
+  purple, QUIC transports green and WireGuard amber; the text uses the
+  text-safe ink for each family.
+- **Cards move under a finger.** A tappable card scales to 98% for 120ms on a
+  touch screen; the Fire TV, which has no finger, is unchanged.
+
+### Added
+
+- **Skeleton rows** while the node list is being read.
+- **A brand rule** under the home page's title: 28×2dp of the brand gradient.
+- **A node detail sheet.** Long-press now opens a header with the protocol
+  tile, the name, its group and its address, followed by the latency curve
+  when the node has samples.
+
 ## [0.9.27] — 2026-11-12
 
 ### Added
