@@ -2,6 +2,7 @@ package com.justnpcx.starveil.feature.dashboard
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,11 +15,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -41,6 +44,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -63,6 +67,8 @@ import com.justnpcx.starveil.core.ui.components.NodeHealthChart
 import com.justnpcx.starveil.core.ui.components.StarveilBadge
 import com.justnpcx.starveil.core.ui.components.StarveilCard
 import com.justnpcx.starveil.core.ui.components.StarveilDivider
+import com.justnpcx.starveil.core.ui.icons.StarveilIcons
+import com.justnpcx.starveil.core.ui.theme.HubTone
 import com.justnpcx.starveil.core.ui.theme.StarveilColors
 import com.justnpcx.starveil.core.ui.theme.StarveilSpacing
 import com.justnpcx.starveil.core.ui.theme.StarveilType
@@ -88,6 +94,18 @@ fun DashboardScreen(
     requestVpnConsent: (onGranted: () -> Unit) -> Unit = { it() },
     /** The node card opens the list the node is chosen from. */
     onOpenNodes: () -> Unit = {},
+    /**
+     * The four destinations under the node card.
+     *
+     * The bottom bar reaches four places; these are the ones it does not, so
+     * the home page can reach them without a trip through the hub. They are
+     * callbacks rather than a route table because :feature:dashboard knows
+     * nothing about :app's navigation graph.
+     */
+    onOpenScenes: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
+    onOpenLogs: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -329,6 +347,26 @@ fun DashboardScreen(
                     }
                 }
             }
+
+            // The four places the bar does not reach. On a tall phone this is
+            // what the page had been leaving blank under the node card; on a
+            // short one it is the first thing below the fold, which is the
+            // right order — the ring and the node still come first.
+            Spacer(modifier = Modifier.height(StarveilSpacing.xl))
+            Text(
+                text = stringResource(R.string.dashboard_shortcuts).uppercase(),
+                style = StarveilType.tech,
+                color = StarveilColors.ink2,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = StarveilSpacing.sm),
+            )
+            ShortcutStrip(
+                onOpenScenes = onOpenScenes,
+                onOpenDiagnostics = onOpenDiagnostics,
+                onOpenLogs = onOpenLogs,
+                onOpenSettings = onOpenSettings,
+            )
 
             // Air under the last card, sized by the tier: a tall screen can
             // afford 24dp above the bar, a short one needs the height for the
@@ -829,6 +867,109 @@ private fun CurrentNodeCard(
                 )
             }
         }
+    }
+}
+
+/**
+ * The four destinations the navigation bar does not list, as one card.
+ *
+ * A single card rather than four: a row of four separate cards at this size
+ * turns into four very round tiles with four shadows, and the page already has
+ * a card for the node. One card, four equal targets, and the hub's own tone
+ * beds — the same grammar the More page uses, at a size that fits under the
+ * node card.
+ */
+@Composable
+private fun ShortcutStrip(
+    onOpenScenes: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
+    onOpenLogs: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    StarveilCard(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = StarveilSpacing.md),
+        ) {
+            ShortcutTile(
+                icon = StarveilIcons.Scenes,
+                tone = StarveilColors.hubScenes,
+                label = stringResource(R.string.dashboard_shortcut_scenes),
+                onClick = onOpenScenes,
+                modifier = Modifier.weight(1f),
+            )
+            ShortcutTile(
+                icon = StarveilIcons.Activity,
+                tone = StarveilColors.hubDiagnostics,
+                label = stringResource(R.string.dashboard_shortcut_diagnostics),
+                onClick = onOpenDiagnostics,
+                modifier = Modifier.weight(1f),
+            )
+            ShortcutTile(
+                icon = StarveilIcons.List,
+                tone = StarveilColors.hubLogs,
+                label = stringResource(R.string.dashboard_shortcut_logs),
+                onClick = onOpenLogs,
+                modifier = Modifier.weight(1f),
+            )
+            ShortcutTile(
+                icon = StarveilIcons.Settings,
+                tone = StarveilColors.hubSettings,
+                label = stringResource(R.string.dashboard_shortcut_settings),
+                onClick = onOpenSettings,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * One shortcut: a 40dp tinted square over its name.
+ *
+ * The bed is the hub row's 38dp bed at 40: this tile has no chevron and no
+ * subtitle, so the glyph carries the whole destination on its own. The ripple
+ * is clipped to the tile rather than to the card, so a tap on the second item
+ * does not paint the whole strip.
+ */
+@Composable
+private fun ShortcutTile(
+    icon: ImageVector,
+    tone: HubTone,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = StarveilSpacing.sm, horizontal = StarveilSpacing.xs),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(tone.bg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tone.ink,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(StarveilSpacing.sm))
+        Text(
+            text = label,
+            style = StarveilType.label,
+            color = StarveilColors.ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
