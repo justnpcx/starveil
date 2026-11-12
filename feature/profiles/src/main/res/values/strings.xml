@@ -124,7 +124,6 @@
     <string name="profiles_chain_clear">Clear the front node</string>
     <string name="profiles_chain_no_candidates">No node can be a front here: a node already behind one cannot front another.</string>
     <string name="profiles_row_move">Move to group</string>
-    <string name="profiles_row_menu_title">%1$s</string>
     <string name="profiles_group_all">All</string>
     <string name="profiles_search_hint">Search name or address</string>
     <string name="profiles_search_clear">Clear search</string>
@@ -243,4 +242,5 @@
     <string name="profiles_delete_front_dependents">%1$d nodes use this as their front and will connect directly after deletion.</string>
     <string name="profiles_share_copy_json">Copy sing-box JSON</string>
     <string name="profiles_share_json_copied">JSON copied</string>
+    <string name="profiles_detail_chart_desc">Latency history for %1$s.</string>
 </resources>
