@@ -76,9 +76,4 @@
     <string name="dashboard_exit_measured">检测时间</string>
     <string name="dashboard_exit_note">往返时延包含一次第三方请求的 DNS、连接与 TLS 耗时，不是 ping。</string>
 
-    <string name="dashboard_shortcuts">快捷入口</string>
-    <string name="dashboard_shortcut_scenes">场景</string>
-    <string name="dashboard_shortcut_diagnostics">诊断自检</string>
-    <string name="dashboard_shortcut_logs">日志</string>
-    <string name="dashboard_shortcut_settings">设置</string>
 </resources>

@@ -76,9 +76,4 @@
     <string name="dashboard_exit_measured">偵測時間</string>
     <string name="dashboard_exit_note">往返延遲包含一次第三方請求的 DNS、連線與 TLS 耗時，不是 ping。</string>
 
-    <string name="dashboard_shortcuts">快捷入口</string>
-    <string name="dashboard_shortcut_scenes">場景</string>
-    <string name="dashboard_shortcut_diagnostics">診斷自檢</string>
-    <string name="dashboard_shortcut_logs">日誌</string>
-    <string name="dashboard_shortcut_settings">設定</string>
 </resources>

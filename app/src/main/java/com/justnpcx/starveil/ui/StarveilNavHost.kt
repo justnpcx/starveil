@@ -194,12 +194,6 @@ fun StarveilNavHost(
                         restoreState = true
                     }
                 },
-                // The same destinations the hub uses. A shortcut is a shorter
-                // path to the page, not a second navigation model.
-                onOpenScenes = { navController.navigate("scenes_tab") },
-                onOpenDiagnostics = { navController.navigate("diagnostics") },
-                onOpenLogs = { navController.navigate("logs_tab") },
-                onOpenSettings = { navController.navigate("settings_tab") },
             )
         }
         }

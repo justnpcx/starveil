@@ -83,9 +83,4 @@
     <string name="dashboard_exit_note">The round trip covers DNS, the connection and TLS for one request to a third party — it is not a ping.</string>
 
     <!-- The four destinations the bottom bar does not reach. -->
-    <string name="dashboard_shortcuts">Shortcuts</string>
-    <string name="dashboard_shortcut_scenes">Scenes</string>
-    <string name="dashboard_shortcut_diagnostics">Diagnostics</string>
-    <string name="dashboard_shortcut_logs">Logs</string>
-    <string name="dashboard_shortcut_settings">Settings</string>
 </resources>
