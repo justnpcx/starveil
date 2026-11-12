@@ -125,7 +125,12 @@ private fun DrawScope.bloom(
 ) {
     val center = Offset(size.width * x, size.height * y)
     val radius = size.width * rx
-    val squash = (size.height * ry) / radius
+    // The blooms are defined as fractions of a portrait canvas. On a very tall
+    // screen the vertical fraction is the smaller one, and the ellipse flattens
+    // into a band with a visible long edge — the "smudge" the live build showed
+    // on a 9:20 phone. Clamping the squash keeps it a bloom; the lower alpha in
+    // the palette is what keeps it faint.
+    val squash = ((size.height * ry) / radius).coerceIn(0.82f, 1f)
     withTransform({
         scale(1f, squash, pivot = center)
     }) {

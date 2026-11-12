@@ -1,6 +1,5 @@
 package com.justnpcx.starveil.core.ui.components
 
-import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -34,11 +33,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -48,6 +47,7 @@ import com.justnpcx.starveil.core.ui.theme.StarveilBrand
 import com.justnpcx.starveil.core.ui.theme.StarveilColors
 import com.justnpcx.starveil.core.ui.theme.StarveilMotion
 import com.justnpcx.starveil.core.ui.theme.StarveilType
+import com.justnpcx.starveil.core.ui.util.rememberAnimationsEnabled
 
 /** Connection states. The core's visuals are a pure function of this state. */
 enum class ConnectionState {
@@ -246,6 +246,10 @@ fun ConnectionCore(
                 style = StarveilType.ringWord,
                 color = if (state == ConnectionState.BLOCKED) StarveilColors.err else StarveilColors.ink,
                 textAlign = TextAlign.Center,
+                // One word, one line. A longer translation must not turn the
+                // state into two lines inside a fixed 204dp ring.
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             if (hint != null) {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -265,18 +269,6 @@ private val CORE_SIZE = 204.dp
 
 /** 5dp, as the task book draws it. */
 private val RING_STROKE = 5.dp
-
-@Composable
-private fun rememberAnimationsEnabled(): Boolean {
-    val context = LocalContext.current
-    return remember(context) {
-        Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) != 0f
-    }
-}
 
 /**
  * The ring's geometry, as a function rather than a constant buried in a
