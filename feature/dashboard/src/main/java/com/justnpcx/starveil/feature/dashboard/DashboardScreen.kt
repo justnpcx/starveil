@@ -520,7 +520,14 @@ private fun ExitCard(
         )
         ExitCardMode.NONE -> noRecord
     }
-    val startedAt = state.sessionStartedAt
+    // The disconnected card's clock belongs to the snapshot, not to the most
+    // recent session: a session that never reached an exit must not date an
+    // older address.
+    val startedAt = if (muted) {
+        last?.sessionStartedAt?.takeIf { it > 0 } ?: state.sessionStartedAt
+    } else {
+        state.sessionStartedAt
+    }
     val time = when {
         mode == ExitCardMode.LIVE ||
             mode == ExitCardMode.NOT_MEASURED ||

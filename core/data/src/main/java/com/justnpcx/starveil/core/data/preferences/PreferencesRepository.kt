@@ -55,7 +55,18 @@ sealed interface ConnectionTarget {
  * greys it out when it is not current, and never lets it stand in for a probe
  * that has not answered yet.
  */
-data class ExitSnapshot(val address: String, val rttMs: Long)
+data class ExitSnapshot(
+    val address: String,
+    val rttMs: Long,
+    /**
+     * When the session that produced this measurement started.
+     *
+     * Kept with the value so the disconnected card's three rows describe one
+     * session. A later session that never reached an exit must not lend its
+     * clock to an older address.
+     */
+    val sessionStartedAt: Long = 0L,
+)
 
 /**
  * One node the app has actually connected to.
@@ -238,7 +249,7 @@ interface PreferencesRepository {
     val lastExit: Flow<ExitSnapshot?> get() = kotlinx.coroutines.flow.flowOf(null)
 
     /** Keep a successful exit measurement for the disconnected card. */
-    suspend fun recordLastExit(address: String, rttMs: Long) = Unit
+    suspend fun recordLastExit(address: String, rttMs: Long, sessionStartedAt: Long = 0L) = Unit
 
     /** When the current or last tunnel session started; 0 when never. */
     val lastSessionStartedAt: Flow<Long> get() = kotlinx.coroutines.flow.flowOf(0L)
@@ -452,6 +463,7 @@ class DataStorePreferencesRepository @Inject constructor(
         val NODE_HINT_SEEN = booleanPreferencesKey("node_hint_seen")
         val LAST_EXIT_ADDRESS = stringPreferencesKey("last_exit_address")
         val LAST_EXIT_RTT_MS = longPreferencesKey("last_exit_rtt_ms")
+        val LAST_EXIT_SESSION_AT = longPreferencesKey("last_exit_session_at")
         val LAST_SESSION_STARTED_AT = longPreferencesKey("last_session_started_at")
         val RECENT_NODE_USES = stringSetPreferencesKey("recent_node_uses")
         val THEME_MODE = stringPreferencesKey("theme_mode")
@@ -549,14 +561,15 @@ class DataStorePreferencesRepository @Inject constructor(
             if (address.isNullOrBlank() || rtt == null || rtt < 0) {
                 null
             } else {
-                ExitSnapshot(address, rtt)
+                ExitSnapshot(address, rtt, prefs[Keys.LAST_EXIT_SESSION_AT] ?: 0L)
             }
         }
 
-    override suspend fun recordLastExit(address: String, rttMs: Long) {
+    override suspend fun recordLastExit(address: String, rttMs: Long, sessionStartedAt: Long) {
         dataStore.edit {
             it[Keys.LAST_EXIT_ADDRESS] = address
             it[Keys.LAST_EXIT_RTT_MS] = rttMs
+            it[Keys.LAST_EXIT_SESSION_AT] = sessionStartedAt
         }
     }
 

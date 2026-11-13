@@ -300,7 +300,15 @@ class DashboardViewModel @Inject constructor(
                         // The same measurement is what the next launch shows
                         // while disconnected; storing it here keeps the card
                         // permanent without a second probe path.
-                        preferences.recordLastExit(info.address, smoothed)
+                        preferences.recordLastExit(
+                            address = info.address,
+                            rttMs = smoothed,
+                            // The card's three rows are one session's facts;
+                            // the clock is stored with the value, not read
+                            // from whatever session happens to be latest.
+                            sessionStartedAt = _uiState.value.sessionStartedAt
+                                ?: System.currentTimeMillis(),
+                        )
                     } else {
                         // The chain ran and nothing answered. The old value is
                         // not a reading of this tunnel any more, so it goes —

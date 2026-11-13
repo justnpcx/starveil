@@ -787,8 +787,13 @@ class DashboardViewModelTest {
         viewModel.onCoreClick()
         yield()
 
-        assertEquals(ExitSnapshot("203.0.113.9", 42), preferences.storedLastExit)
-        assertEquals(ExitSnapshot("203.0.113.9", 42), viewModel.uiState.value.lastExit)
+        val stored = preferences.storedLastExit
+        assertEquals("203.0.113.9", stored?.address)
+        assertEquals(42L, stored?.rttMs)
+        // The clock is stored with the value: the disconnected card's three
+        // rows are one session's facts.
+        assertEquals(preferences.storedSessionStart, stored?.sessionStartedAt)
+        assertEquals(stored, viewModel.uiState.value.lastExit)
     }
 
     @Test
@@ -1007,8 +1012,8 @@ private class FakePreferences(
     private val recentUsesFlow = MutableStateFlow<List<RecentNodeUse>>(emptyList())
 
     override val lastExit: Flow<ExitSnapshot?> = lastExitFlow
-    override suspend fun recordLastExit(address: String, rttMs: Long) {
-        lastExitFlow.value = ExitSnapshot(address, rttMs)
+    override suspend fun recordLastExit(address: String, rttMs: Long, sessionStartedAt: Long) {
+        lastExitFlow.value = ExitSnapshot(address, rttMs, sessionStartedAt)
         wrote()
     }
 
