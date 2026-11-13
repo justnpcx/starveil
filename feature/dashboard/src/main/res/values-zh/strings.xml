@@ -54,7 +54,6 @@
     <string name="dashboard_notice_kernel_refused_reason">内核启动失败：%1$s</string>
     <string name="dashboard_mode_auto">自动</string>
     <string name="dashboard_mode_manual">手动</string>
-    <string name="dashboard_exit">出口 IP %1$s · 出口往返 %2$d ms（经节点实测）</string>
     <string name="dashboard_hint_connect">点按连接</string>
     <string name="dashboard_hint_disconnect">点按断开</string>
     <string name="dashboard_hint_connecting">正在建立隧道</string>
@@ -69,16 +68,20 @@
     <string name="dashboard_exit_details_title">出口</string>
     <string name="dashboard_exit_address">出口 IP</string>
     <string name="dashboard_exit_rtt_smoothed">出口延迟</string>
-    <string name="dashboard_exit_last">上次出口 %1$s</string>
     <string name="dashboard_exit_unmeasured">出口未测得 · 点按重试</string>
     <string name="dashboard_exit_rtt">往返时延</string>
     <string name="dashboard_exit_rtt_value">%1$d ms</string>
     <string name="dashboard_exit_measured">检测时间</string>
     <string name="dashboard_exit_note">往返时延包含一次第三方请求的 DNS、连接与 TLS 耗时，不是 ping。</string>
 
-    <string name="dashboard_shortcuts">快捷入口</string>
-    <string name="dashboard_shortcut_scenes">场景</string>
-    <string name="dashboard_shortcut_diagnostics">诊断自检</string>
-    <string name="dashboard_shortcut_logs">日志</string>
-    <string name="dashboard_shortcut_settings">设置</string>
+    <string name="dashboard_exit_time">时间</string>
+    <string name="dashboard_exit_probe_failed">探测失败 · 点按重试</string>
+    <string name="dashboard_exit_no_record">暂无记录</string>
+    <string name="dashboard_exit_session_today">今天 %1$s 开始 · 进行中</string>
+    <string name="dashboard_exit_session_date">%1$s 开始 · 进行中</string>
+    <string name="dashboard_exit_last_today">上次会话 今天 %1$s</string>
+    <string name="dashboard_exit_last_date">上次会话 %1$s</string>
+    <string name="dashboard_recent_title">最近使用</string>
+    <string name="dashboard_recent_health">%1$d ms · 在线 %2$d%%</string>
+    <string name="dashboard_recent_untested">未测得</string>
 </resources>

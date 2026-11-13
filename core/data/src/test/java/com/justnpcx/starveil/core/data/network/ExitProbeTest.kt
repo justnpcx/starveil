@@ -1,9 +1,14 @@
 package com.justnpcx.starveil.core.data.network
 
 import com.justnpcx.starveil.core.data.log.AppLogSink
+import com.justnpcx.starveil.core.model.AppLogLevel
 import java.io.IOException
 import javax.net.ssl.SSLHandshakeException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -97,6 +102,24 @@ class ExitProbeTest {
         assertEquals("198.51.100.7", probe.probe()?.address)
         assertEquals(3, calls.size)
         assertTrue(calls.last().contains("ipify"))
+    }
+
+    @Test
+    fun `a failed chain writes a WARN to the app log`() = runBlocking {
+        val sink = AppLogSink()
+        val probe = object : ExitProbe(sink) {
+            override suspend fun fetch(url: String): String = throw IOException("no route")
+        }
+
+        // Subscribe before the probe: the sink is an event stream with no
+        // replay, and a line emitted with no reader is gone.
+        val line = async(start = CoroutineStart.UNDISPATCHED) { sink.lines.first() }
+        probe.probe()
+        val logged = withTimeout(1_000) { line.await() }
+
+        assertEquals(AppLogLevel.WARN, logged.level)
+        assertEquals("exit", logged.tag)
+        assertTrue(logged.message.startsWith("exit probe failed"))
     }
 
     @Test

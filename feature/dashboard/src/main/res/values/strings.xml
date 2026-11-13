@@ -60,7 +60,6 @@
     <string name="dashboard_notice_kernel_refused_reason">Kernel failed to start: %1$s</string>
     <string name="dashboard_mode_auto">Auto</string>
     <string name="dashboard_mode_manual">Manual</string>
-    <string name="dashboard_exit">Exit IP %1$s · exit round trip %2$d ms (measured through the node)</string>
     <string name="dashboard_hint_connect">Tap to connect</string>
     <string name="dashboard_hint_disconnect">Tap to disconnect</string>
     <string name="dashboard_hint_connecting">Bringing the tunnel up</string>
@@ -75,7 +74,6 @@
     <string name="dashboard_exit_details_title">Exit</string>
     <string name="dashboard_exit_address">Exit IP</string>
     <string name="dashboard_exit_rtt_smoothed">Exit latency</string>
-    <string name="dashboard_exit_last">Last exit %1$s</string>
     <string name="dashboard_exit_unmeasured">Exit not measured · tap to retry</string>
     <string name="dashboard_exit_rtt">Round trip</string>
     <string name="dashboard_exit_rtt_value">%1$d ms</string>
@@ -83,9 +81,14 @@
     <string name="dashboard_exit_note">The round trip covers DNS, the connection and TLS for one request to a third party — it is not a ping.</string>
 
     <!-- The four destinations the bottom bar does not reach. -->
-    <string name="dashboard_shortcuts">Shortcuts</string>
-    <string name="dashboard_shortcut_scenes">Scenes</string>
-    <string name="dashboard_shortcut_diagnostics">Diagnostics</string>
-    <string name="dashboard_shortcut_logs">Logs</string>
-    <string name="dashboard_shortcut_settings">Settings</string>
+    <string name="dashboard_exit_time">Time</string>
+    <string name="dashboard_exit_probe_failed">Probe failed · tap to retry</string>
+    <string name="dashboard_exit_no_record">No record</string>
+    <string name="dashboard_exit_session_today">Started today %1$s · ongoing</string>
+    <string name="dashboard_exit_session_date">Started %1$s · ongoing</string>
+    <string name="dashboard_exit_last_today">Last session today %1$s</string>
+    <string name="dashboard_exit_last_date">Last session %1$s</string>
+    <string name="dashboard_recent_title">Recent</string>
+    <string name="dashboard_recent_health">%1$d ms · online %2$d%%</string>
+    <string name="dashboard_recent_untested">Not measured</string>
 </resources>

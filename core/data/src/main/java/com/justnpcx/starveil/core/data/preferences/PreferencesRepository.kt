@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.justnpcx.starveil.core.model.AppRoute
 import com.justnpcx.starveil.core.model.KillSwitchMode
@@ -45,6 +46,36 @@ sealed interface ConnectionTarget {
 
     data class Group(val id: Long) : ConnectionTarget
 }
+
+/**
+ * The last successful exit measurement.
+ *
+ * Kept across launches so the exit card can show what the last session saw
+ * while the tunnel is down. It is a session fact, not a live reading: the card
+ * greys it out when it is not current, and never lets it stand in for a probe
+ * that has not answered yet.
+ */
+data class ExitSnapshot(
+    val address: String,
+    val rttMs: Long,
+    /**
+     * When the session that produced this measurement started.
+     *
+     * Kept with the value so the disconnected card's three rows describe one
+     * session. A later session that never reached an exit must not lend its
+     * clock to an older address.
+     */
+    val sessionStartedAt: Long = 0L,
+)
+
+/**
+ * One node the app has actually connected to.
+ *
+ * [nodeKey] is the business key, not the row id: a subscription refresh
+ * replaces a group's rows and their ids, and the history has to survive that.
+ * An entry whose key no longer resolves is dropped by the reader.
+ */
+data class RecentNodeUse(val nodeKey: String, val atEpochMs: Long)
 
 private val Context.starveilDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "starveil_preferences",
@@ -213,6 +244,25 @@ interface PreferencesRepository {
 
     /** Last leak self-check (minimal M2 version). */
     val lastLeakCheck: Flow<LeakCheckRecord>
+
+    /** The last successful exit measurement, or null when none is stored. */
+    val lastExit: Flow<ExitSnapshot?> get() = kotlinx.coroutines.flow.flowOf(null)
+
+    /** Keep a successful exit measurement for the disconnected card. */
+    suspend fun recordLastExit(address: String, rttMs: Long, sessionStartedAt: Long = 0L) = Unit
+
+    /** When the current or last tunnel session started; 0 when never. */
+    val lastSessionStartedAt: Flow<Long> get() = kotlinx.coroutines.flow.flowOf(0L)
+
+    /** Record the start of a tunnel session, so the card can show it later. */
+    suspend fun recordSessionStart(atEpochMs: Long) = Unit
+
+    /** Nodes the app has connected to, newest first. */
+    val recentNodeUses: Flow<List<RecentNodeUse>> get() =
+        kotlinx.coroutines.flow.flowOf(emptyList())
+
+    /** Record that a node was actually used, moving it to the front. */
+    suspend fun recordNodeUse(nodeKey: String, atEpochMs: Long) = Unit
 
     /**
      * True once a tunnel has actually come up on this install.
@@ -411,6 +461,11 @@ class DataStorePreferencesRepository @Inject constructor(
         val MANUAL_PRESET_AT = longPreferencesKey("manual_preset_at")
         val HAS_CONNECTED_ONCE = booleanPreferencesKey("has_connected_once")
         val NODE_HINT_SEEN = booleanPreferencesKey("node_hint_seen")
+        val LAST_EXIT_ADDRESS = stringPreferencesKey("last_exit_address")
+        val LAST_EXIT_RTT_MS = longPreferencesKey("last_exit_rtt_ms")
+        val LAST_EXIT_SESSION_AT = longPreferencesKey("last_exit_session_at")
+        val LAST_SESSION_STARTED_AT = longPreferencesKey("last_session_started_at")
+        val RECENT_NODE_USES = stringSetPreferencesKey("recent_node_uses")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val NODE_SELECTION_MODE = stringPreferencesKey("node_selection_mode")
     }
@@ -497,6 +552,47 @@ class DataStorePreferencesRepository @Inject constructor(
                 leaking = prefs[Keys.LEAK_CHECK_LEAKING] ?: false,
             )
         }
+
+    override val lastExit: Flow<ExitSnapshot?> = dataStore.data
+        .catch { if (it is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw it }
+        .map { prefs ->
+            val address = prefs[Keys.LAST_EXIT_ADDRESS]
+            val rtt = prefs[Keys.LAST_EXIT_RTT_MS]
+            if (address.isNullOrBlank() || rtt == null || rtt < 0) {
+                null
+            } else {
+                ExitSnapshot(address, rtt, prefs[Keys.LAST_EXIT_SESSION_AT] ?: 0L)
+            }
+        }
+
+    override suspend fun recordLastExit(address: String, rttMs: Long, sessionStartedAt: Long) {
+        dataStore.edit {
+            it[Keys.LAST_EXIT_ADDRESS] = address
+            it[Keys.LAST_EXIT_RTT_MS] = rttMs
+            it[Keys.LAST_EXIT_SESSION_AT] = sessionStartedAt
+        }
+    }
+
+    override val lastSessionStartedAt: Flow<Long> = dataStore.data
+        .catch { if (it is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw it }
+        .map { prefs -> prefs[Keys.LAST_SESSION_STARTED_AT] ?: 0L }
+
+    override suspend fun recordSessionStart(atEpochMs: Long) {
+        dataStore.edit { it[Keys.LAST_SESSION_STARTED_AT] = atEpochMs }
+    }
+
+    override val recentNodeUses: Flow<List<RecentNodeUse>> = dataStore.data
+        .catch { if (it is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw it }
+        .map { prefs -> decodeRecentNodeUses(prefs[Keys.RECENT_NODE_USES]) }
+
+    override suspend fun recordNodeUse(nodeKey: String, atEpochMs: Long) {
+        if (nodeKey.isEmpty()) return
+        dataStore.edit { prefs ->
+            val current = decodeRecentNodeUses(prefs[Keys.RECENT_NODE_USES])
+            val next = mergeRecentNodeUse(current, nodeKey, atEpochMs)
+            prefs[Keys.RECENT_NODE_USES] = next.map(::encodeRecentNodeUse).toSet()
+        }
+    }
 
     override suspend fun setBypassMainland(enabled: Boolean) {
         dataStore.edit { it[Keys.BYPASS_MAINLAND] = enabled }
@@ -758,3 +854,32 @@ private fun parseUsage(raw: String?): Map<Long, com.justnpcx.starveil.core.model
     }
     return out
 }
+
+/** How many uses are kept; the card only ever draws three. */
+private const val MAX_RECENT_NODE_USES = 20
+
+/** One set entry: timestamp first, so the node key may contain anything. */
+internal fun encodeRecentNodeUse(use: RecentNodeUse): String =
+    "${use.atEpochMs}|${use.nodeKey}"
+
+/** Newest first; malformed entries are dropped rather than crashing a read. */
+internal fun decodeRecentNodeUses(entries: Set<String>?): List<RecentNodeUse> =
+    entries.orEmpty().mapNotNull { entry ->
+        val at = entry.substringBefore('|').toLongOrNull() ?: return@mapNotNull null
+        val key = entry.substringAfter('|', missingDelimiterValue = "")
+        if (key.isEmpty()) null else RecentNodeUse(key, at)
+    }.sortedByDescending { it.atEpochMs }
+
+/**
+ * Record one use: the same node moves to the front instead of appearing twice,
+ * and the list stays bounded.
+ */
+internal fun mergeRecentNodeUse(
+    current: List<RecentNodeUse>,
+    nodeKey: String,
+    atEpochMs: Long,
+    limit: Int = MAX_RECENT_NODE_USES,
+): List<RecentNodeUse> =
+    (current.filterNot { it.nodeKey == nodeKey } + RecentNodeUse(nodeKey, atEpochMs))
+        .sortedByDescending { it.atEpochMs }
+        .take(limit)
