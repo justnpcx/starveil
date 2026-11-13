@@ -8,6 +8,33 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.29] — 2026-11-13
+
+### Changed
+
+- **The home shortcuts are gone.** The four added in 0.9.27 left with this
+  release: the hub already holds them, and on the home page they cost a
+  permanent row between the state and the exit. The page now ends at the exit
+  card and the recently used list.
+- **The exit card is permanent.** Three rows at one height in both states:
+  exit IP, exit latency and the session clock. Disconnected shows the last
+  session's snapshot in secondary ink — not a dimmed card, not a blank — and
+  the two data rows read "Last exit IP" and "Last exit latency", so the state
+  does not rely on colour alone. A running tunnel with no answer says "not
+  measured"; a failed probe says "probe failed" and writes a WARN to the log.
+
+### Added
+
+- **Recently used nodes.** Up to three nodes the app has actually connected
+  to, newest first, current excluded, under the exit card. Tapping one selects
+  it through the same path the Nodes page uses; a deleted node leaves no row.
+
+### Fixed
+
+- **The disconnected card's clock belongs to its snapshot.** A session that
+  never reached an exit could date an older address; the three rows now always
+  describe one session.
+
 ## [0.9.28] — 2026-11-12
 
 ### Changed
