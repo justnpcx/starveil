@@ -91,4 +91,6 @@
     <string name="dashboard_recent_title">Recent</string>
     <string name="dashboard_recent_health">%1$d ms · online %2$d%%</string>
     <string name="dashboard_recent_untested">Not measured</string>
+    <string name="dashboard_exit_last_address">Last exit IP</string>
+    <string name="dashboard_exit_last_latency">Last exit latency</string>
 </resources>
