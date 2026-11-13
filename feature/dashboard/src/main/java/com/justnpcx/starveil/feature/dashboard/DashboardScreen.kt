@@ -544,9 +544,27 @@ private fun ExitCard(
             else -> null
         },
     ) {
-        ExitRow(stringResource(R.string.dashboard_exit_address), ip, muted)
+        // A previous session says so in words as well as in grey: colour on
+        // its own is not a signal a colour-blind reader can use, and the
+        // palette has one secondary grade, so the label carries the state.
+        val stale = mode == ExitCardMode.LAST
+        ExitRow(
+            label = stringResource(
+                if (stale) R.string.dashboard_exit_last_address
+                else R.string.dashboard_exit_address,
+            ),
+            value = ip,
+            muted = muted,
+        )
         StarveilDivider(startInset = StarveilSpacing.lg)
-        ExitRow(stringResource(R.string.dashboard_exit_rtt_smoothed), rtt, muted)
+        ExitRow(
+            label = stringResource(
+                if (stale) R.string.dashboard_exit_last_latency
+                else R.string.dashboard_exit_rtt_smoothed,
+            ),
+            value = rtt,
+            muted = muted,
+        )
         StarveilDivider(startInset = StarveilSpacing.lg)
         ExitRow(stringResource(R.string.dashboard_exit_time), time, muted)
     }
