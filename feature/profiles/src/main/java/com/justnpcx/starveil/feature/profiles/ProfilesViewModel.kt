@@ -426,7 +426,9 @@ class ProfilesViewModel @Inject constructor(
      */
     fun setSelectionMode(mode: NodeSelectionMode) {
         viewModelScope.launch {
-            if (preferences.nodeSelectionMode.first() == mode) return@launch
+            // Deliberately not guarded on "already this mode": tapping
+            // "Fastest" while already automatic is a request to pick now, and
+            // a guard would make the row's first tap do nothing at all.
             preferences.setNodeSelectionMode(mode)
             if (mode != NodeSelectionMode.AUTO) return@launch
             val pick = autoPicker.pick() ?: return@launch
