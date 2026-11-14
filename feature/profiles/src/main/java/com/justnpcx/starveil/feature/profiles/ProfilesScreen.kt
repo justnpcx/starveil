@@ -32,6 +32,7 @@ import com.justnpcx.starveil.core.subscription.ImportFailure
 import com.justnpcx.starveil.core.subscription.SubscriptionFailure
 import com.justnpcx.starveil.core.model.NodeHealth
 import com.justnpcx.starveil.core.model.NodeRegions
+import com.justnpcx.starveil.core.model.NodeSelectionMode
 import com.justnpcx.starveil.core.model.NodeStatus
 import com.justnpcx.starveil.core.ui.components.LatencySparkline
 import com.justnpcx.starveil.core.ui.components.NodeHealthChart
@@ -40,6 +41,7 @@ import com.justnpcx.starveil.core.ui.components.StarveilSkeletonRow
 import com.justnpcx.starveil.core.ui.components.ChipSurface
 import com.justnpcx.starveil.core.ui.components.StarveilChip
 import com.justnpcx.starveil.core.ui.components.StarveilChipRow
+import com.justnpcx.starveil.core.ui.components.StarveilSegmented
 import com.justnpcx.starveil.core.ui.components.StarveilDivider
 import com.justnpcx.starveil.core.ui.components.StarveilIconAction
 import com.justnpcx.starveil.core.ui.components.StarveilSearchField
@@ -213,6 +215,7 @@ fun ProfilesScreen(
     onScannedHandled: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val selectionMode by viewModel.selectionMode.collectAsStateWithLifecycle()
     val probeState by probeViewModel.state.collectAsStateWithLifecycle()
     val clipboardSuggestion by viewModel.clipboardSuggestion.collectAsStateWithLifecycle()
     val subscriptionImport by viewModel.lastSubscriptionImport.collectAsStateWithLifecycle()
@@ -434,6 +437,17 @@ fun ProfilesScreen(
                         },
                     )
                 }
+            }
+            // The global choice — auto or by hand — above everything else on
+            // the page. It is deliberately not the group mode: that one lives
+            // in a group's long-press menu and only affects that group, while
+            // this one decides how the app picks a node at all. Different
+            // words, different place, so the two cannot be read as one.
+            if (state.hasProfiles) {
+                SelectionModeRow(
+                    mode = selectionMode,
+                    onChange = viewModel::setSelectionMode,
+                )
             }
             // Above the group chips, and only once there is something to
             // search: an empty list already says "import something", and a
@@ -1982,6 +1996,52 @@ private const val SELECTED_HALO_ALPHA = 0.16f
  * are not this one feel like a mode change. `OutlinedTextField` at 48dp is the
  * same height as the chip row below it, so the two read as one control block.
  */
+/**
+ * The global selection mode: automatic picks the fastest node, manual leaves
+ * the choice to the user.
+ *
+ * A labelled row rather than two bare chips: "Fastest / By hand" alone would
+ * read as a filter on the list, which is exactly what the group chips above
+ * the list are. The label says this is about *how a node is chosen*.
+ */
+@Composable
+private fun SelectionModeRow(
+    mode: NodeSelectionMode,
+    onChange: (NodeSelectionMode) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = StarveilSpacing.pageMargin,
+                end = StarveilSpacing.pageMargin,
+                top = StarveilSpacing.sm,
+                bottom = StarveilSpacing.xs,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.profiles_selection_label),
+            style = StarveilType.label,
+            color = StarveilColors.ink2,
+            maxLines = 1,
+        )
+        Spacer(modifier = Modifier.width(StarveilSpacing.md))
+        StarveilSegmented(
+            options = listOf(
+                stringResource(R.string.profiles_selection_auto),
+                stringResource(R.string.profiles_selection_manual),
+            ),
+            selectedIndex = if (mode == NodeSelectionMode.AUTO) 0 else 1,
+            onSelect = { index ->
+                onChange(if (index == 0) NodeSelectionMode.AUTO else NodeSelectionMode.MANUAL)
+            },
+            modifier = Modifier.weight(1f),
+            proportional = true,
+        )
+    }
+}
+
 @Composable
 private fun SearchField(
     query: String,

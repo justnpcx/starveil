@@ -3,6 +3,7 @@ package com.justnpcx.starveil.feature.profiles
 import com.justnpcx.starveil.core.data.preferences.ConnectionTarget
 import com.justnpcx.starveil.core.data.preferences.PreferencesRepository
 import com.justnpcx.starveil.core.data.repository.GroupRepository
+import com.justnpcx.starveil.core.data.repository.NodeAutoPicker
 import com.justnpcx.starveil.core.data.repository.NodeHealthRepository
 import com.justnpcx.starveil.core.data.geo.CountryResolver
 import com.justnpcx.starveil.core.data.repository.ProfileRepository
@@ -935,6 +936,7 @@ class ProfilesViewModelTest {
             undo = undo,
             nodeHealth = nodeHealth,
             countryResolver = NoCountries,
+            autoPicker = NodeAutoPicker(profiles, nodeHealth, preferences),
             // Import is not what this test exercises; it only has to exist.
             importer = LinkImporter(
                 resolver = LinkResolver { null },
