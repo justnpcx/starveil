@@ -7,6 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import com.justnpcx.starveil.core.ui.icons.StarveilIcons
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -56,8 +64,6 @@ import com.justnpcx.starveil.core.ui.components.StarveilSnackbarHost
 import com.justnpcx.starveil.core.ui.components.ConnectionCore
 import com.justnpcx.starveil.core.ui.components.ConnectionCoreGeometry
 import com.justnpcx.starveil.core.ui.components.ConnectionState
-import com.justnpcx.starveil.core.ui.components.NodeHealthChart
-import com.justnpcx.starveil.core.ui.components.StarveilBadge
 import com.justnpcx.starveil.core.ui.components.StarveilCard
 import com.justnpcx.starveil.core.ui.components.StarveilDivider
 import com.justnpcx.starveil.core.ui.theme.StarveilColors
@@ -110,7 +116,6 @@ fun DashboardScreen(
     // The notice whose details are open, if any. Held here rather than in the
     // view model: it is whether a dialog is showing, not what the app knows.
     var details by remember { mutableStateOf<DashboardNotice?>(null) }
-    var healthOpen by remember { mutableStateOf(false) }
     var exitOpen by remember { mutableStateOf(false) }
 
     // A persistent notice is a condition that lasts until something changes —
@@ -231,27 +236,16 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(metrics.cardGap))
 
-            // The node's latency and availability belong to the node, so they
-            // sit on its card rather than on a second card that repeated the
-            // same number. The curve is still one tap away: the sub-line is the
-            // entry point.
-            CurrentNodeCard(
-                name = state.selectedNodeName ?: stringResource(R.string.dashboard_no_node),
-                health = state.health,
-                onOpen = onOpenNodes,
-                onOpenHealth = { healthOpen = true },
-                padding = metrics.cardPadding,
-            )
-
-            // The exit card is permanent: three rows, one height, in both
-            // states. The values change; the card does not move, so the
-            // recent-node section below it keeps its position across a
-            // connect/disconnect.
-            Spacer(modifier = Modifier.height(StarveilSpacing.md))
-            ExitCard(
+            // One card, two zones: the node above, the exit below. They were
+            // two cards because they were two objects; they are one object now
+            // — the connection — and a single edge says so without repeating
+            // the card grammar twice on one screen.
+            ConnectionCard(
                 state = state,
+                onOpenNodes = onOpenNodes,
                 onOpenDetails = { exitOpen = true },
                 onRetry = viewModel::retryExitProbe,
+                padding = metrics.cardPadding,
             )
 
             // The recent rows are content, not navigation: they fill the space
@@ -289,12 +283,6 @@ fun DashboardScreen(
 
         details?.let { notice ->
             FailureDetailsDialog(notice = notice, onDismiss = { details = null })
-        }
-
-        if (healthOpen) {
-            state.health?.let { health ->
-                NodeHealthDetailsDialog(health = health, onDismiss = { healthOpen = false })
-            }
         }
 
         if (exitOpen) {
@@ -346,63 +334,6 @@ private fun FailureDetailsDialog(notice: DashboardNotice, onDismiss: () -> Unit)
             }
         },
     )
-}
-
-/**
- * The curve, and what its three marks mean.
- *
- * The legend is the point of the dialog: "availability", "latency EMA" and
- * "loss dots" are three different measurements, and a user who reads them as
- * one line will think a node with 3% availability is a node that is fast.
- */
-@Composable
-private fun NodeHealthDetailsDialog(health: NodeHealth, onDismiss: () -> Unit) {
-    val reachable = health.samples.filter { it.reachable }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.dashboard_health_details_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(StarveilSpacing.sm)) {
-                NodeHealthChart(
-                    health = health,
-                    contentDescription = if (reachable.isEmpty()) {
-                        stringResource(R.string.dashboard_health_chart_empty)
-                    } else {
-                        stringResource(
-                            R.string.dashboard_health_chart_desc,
-                            reachable.size,
-                            reachable.minOf { it.latencyMs },
-                            reachable.maxOf { it.latencyMs },
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = HEALTH_MIN_HEIGHT),
-                )
-                if (reachable.isEmpty()) {
-                    Text(
-                        text = stringResource(
-                            R.string.dashboard_health_all_unreachable,
-                            health.samples.size,
-                        ),
-                        style = StarveilType.label,
-                        color = StarveilColors.errText,
-                    )
-                }
-                HealthLegend(stringResource(R.string.dashboard_health_legend_availability))
-                HealthLegend(stringResource(R.string.dashboard_health_legend_ema))
-                HealthLegend(stringResource(R.string.dashboard_health_legend_loss))
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.dashboard_failure_close))
-            }
-        },
-    )
-}
-
-@Composable
-private fun HealthLegend(text: String) {
-    Text(text = text, style = StarveilType.tech, color = StarveilColors.ink2)
 }
 
 /**
@@ -479,11 +410,7 @@ internal fun exitCardMode(
  * may borrow the previous session's value.
  */
 @Composable
-private fun ExitCard(
-    state: DashboardUiState,
-    onOpenDetails: () -> Unit,
-    onRetry: () -> Unit,
-) {
+private fun ExitZone(state: DashboardUiState, padding: Dp) {
     val connected = state.connectionState == ConnectionState.CONNECTED ||
         state.connectionState == ConnectionState.WARNING
     val live = state.exit
@@ -532,18 +459,11 @@ private fun ExitCard(
         startedAt != null -> lastSessionText(startedAt)
         else -> noRecord
     }
-    StarveilCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = when {
-            connected && live == null -> onRetry
-            connected -> onOpenDetails
-            else -> null
-        },
-    ) {
-        // A previous session says so in words as well as in grey: colour on
-        // its own is not a signal a colour-blind reader can use, and the
-        // palette has one secondary grade, so the label carries the state.
-        val stale = mode == ExitCardMode.LAST
+    // A previous session says so in words as well as in grey: colour on its
+    // own is not a signal a colour-blind reader can use, and the palette has
+    // one secondary grade, so the label carries the state.
+    val stale = mode == ExitCardMode.LAST
+    Column(modifier = Modifier.fillMaxWidth()) {
         ExitRow(
             label = stringResource(
                 if (stale) R.string.dashboard_exit_last_address
@@ -551,6 +471,7 @@ private fun ExitCard(
             ),
             value = ip,
             muted = muted,
+            padding = padding,
         )
         StarveilDivider(startInset = StarveilSpacing.lg)
         ExitRow(
@@ -560,9 +481,15 @@ private fun ExitCard(
             ),
             value = rtt,
             muted = muted,
+            padding = padding,
         )
         StarveilDivider(startInset = StarveilSpacing.lg)
-        ExitRow(stringResource(R.string.dashboard_exit_time), time, muted)
+        ExitRow(
+            label = stringResource(R.string.dashboard_exit_time),
+            value = time,
+            muted = muted,
+            padding = padding,
+        )
     }
 }
 
@@ -608,11 +535,16 @@ private fun sessionClock(atEpochMs: Long): SessionClock {
 
 /** One labelled fact on the exit card: the name on the left, the value right. */
 @Composable
-private fun ExitRow(label: String, value: String, muted: Boolean = false) {
+private fun ExitRow(
+    label: String,
+    value: String,
+    muted: Boolean = false,
+    padding: Dp = StarveilSpacing.lg,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = StarveilSpacing.lg, vertical = StarveilSpacing.md),
+            .padding(horizontal = padding, vertical = StarveilSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -829,67 +761,107 @@ private fun formatScaledParts(value: Double, units: List<String>): RateParts {
 }
 
 /**
- * The node the next connect will use, with the one-tap pick beside it.
+ * The connection, as one card with two targets.
  *
- * A glass card, because the node is an object and the page needs one thing with
- * an edge above the health curve. The badge sits in the name's row — it
- * modifies the node, so it belongs to that line.
+ * Above: the node the next connect will use, one line. Below: the exit, three
+ * lines, in both states. They are separate buttons because they lead to
+ * different places — the node list, and the exit — and each draws a focus ring
+ * so a keyboard or a D-pad can see where a press would land.
  */
-
 @Composable
-private fun CurrentNodeCard(
-    name: String,
-    health: NodeHealth?,
-    onOpen: () -> Unit,
-    /** The health dialog's only entry point now that its card is gone. */
-    onOpenHealth: () -> Unit,
+private fun ConnectionCard(
+    state: DashboardUiState,
+    onOpenNodes: () -> Unit,
+    onOpenDetails: () -> Unit,
+    onRetry: () -> Unit,
     padding: Dp = StarveilSpacing.lg,
 ) {
-    StarveilCard(onClick = onOpen) {
-        Box {
-            Column(modifier = Modifier.padding(padding)) {
-                // No texture. The card is already separated from the page
-                // by its edge, its shadow and the page's own wash; a drawn
-                // weave on top of that read as a smudge at phone size.
-                Row(verticalAlignment = Alignment.Top) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        NodeName(name = name)
-                        health?.let { h ->
-                            // One line, two facts: the latency and the share of
-                            // probes that came back. It is also the way into
-                            // the curve, which no longer has a card of its own.
-                            val ema = h.emaMs
-                            val text = when {
-                                h.collecting -> stringResource(
-                                    R.string.dashboard_health_collecting,
-                                    h.samples.size,
-                                    NodeHealth.MIN_SAMPLES,
-                                )
-                                ema == null -> stringResource(
-                                    R.string.dashboard_health_all_unreachable,
-                                    h.samples.size,
-                                )
-                                else -> stringResource(
-                                    R.string.dashboard_node_health_inline,
-                                    ema,
-                                    h.availabilityPct.roundToInt(),
-                                )
-                            }
-                            Text(
-                                text = text,
-                                style = StarveilType.label,
-                                color = StarveilColors.ink2,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .padding(top = 2.dp)
-                                    .clickable(role = Role.Button, onClick = onOpenHealth),
-                            )
-                        }
-                    }
-                }
-            }
+    val connected = state.connectionState == ConnectionState.CONNECTED ||
+        state.connectionState == ConnectionState.WARNING
+    StarveilCard(modifier = Modifier.fillMaxWidth()) {
+        CardZone(onClick = onOpenNodes) {
+            NodeZone(
+                name = state.selectedNodeName ?: stringResource(R.string.dashboard_no_node),
+                health = state.health,
+                padding = padding,
+            )
         }
+        StarveilDivider(startInset = StarveilSpacing.lg)
+        // A tap on the exit is about the exit: while the tunnel is up it opens
+        // the measurement, or retries one that has not answered; while it is
+        // down it asks the probe again. It never promotes the stored snapshot
+        // to a live value.
+        CardZone(
+            onClick = when {
+                connected && state.exit == null -> onRetry
+                connected -> onOpenDetails
+                else -> onRetry
+            },
+        ) {
+            ExitZone(state = state, padding = padding)
+        }
+    }
+}
+
+/**
+ * One of the card's two targets.
+ *
+ * A real button: [clickable] gives it the button role and a focus target, and
+ * the ring is drawn only while it holds focus. A box with a click would have
+ * neither, and on a D-pad the zone would be invisible.
+ */
+@Composable
+private fun CardZone(
+    onClick: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val accent = StarveilColors.accent
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(role = Role.Button, onClick = onClick)
+            .drawWithContent {
+                drawContent()
+                if (focused) {
+                    val stroke = 2.dp.toPx()
+                    val inset = 3.dp.toPx()
+                    drawRoundRect(
+                        color = accent,
+                        topLeft = Offset(inset, inset),
+                        size = Size(size.width - inset * 2, size.height - inset * 2),
+                        cornerRadius = CornerRadius(14.dp.toPx()),
+                        style = Stroke(stroke),
+                    )
+                }
+            },
+        content = content,
+    )
+}
+
+/**
+ * The node, on one line: flag and name left, latency and availability right.
+ *
+ * The name gives up its width first — it is the only part with an ellipsis —
+ * and the numbers never wrap, so a long node name cannot push them off.
+ */
+@Composable
+private fun NodeZone(name: String, health: NodeHealth?, padding: Dp) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = padding, vertical = StarveilSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NodeName(name = name, modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.width(StarveilSpacing.md))
+        Text(
+            text = healthLine(health),
+            style = StarveilType.tech,
+            color = StarveilColors.ink2,
+            maxLines = 1,
+        )
     }
 }
 
@@ -925,7 +897,7 @@ private fun RecentNodeRow(node: RecentNodeUi, onClick: () -> Unit) {
             NodeName(name = node.profile.displayName())
             Spacer(modifier = Modifier.height(StarveilSpacing.xs))
             Text(
-                text = recentHealthText(node.health),
+                text = healthLine(node.health),
                 style = StarveilType.label,
                 color = StarveilColors.ink2,
                 maxLines = 1,
@@ -936,7 +908,7 @@ private fun RecentNodeRow(node: RecentNodeUi, onClick: () -> Unit) {
 }
 
 @Composable
-private fun recentHealthText(health: NodeHealth?): String {
+private fun healthLine(health: NodeHealth?): String {
     val ema = health?.emaMs
     return if (ema == null) {
         stringResource(R.string.dashboard_recent_untested)
@@ -974,6 +946,9 @@ private fun NodeName(name: String, modifier: Modifier = Modifier) {
             color = StarveilColors.ink,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            // The name is the only part of a row allowed to give up width:
+            // the numbers beside it must keep theirs.
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }
