@@ -201,7 +201,7 @@ fun DashboardScreen(
                 ),
             )
 
-            SpeedSection(state = state, modifier = Modifier.height(metrics.telemetry))
+            SpeedSection(state = state, modifier = Modifier.heightIn(min = metrics.telemetry))
 
             // The context line sits under the group it explains, in a fixed
             // slot, so a state change cannot move anything below it. A failure
@@ -248,6 +248,7 @@ fun DashboardScreen(
                 onOpenDetails = { exitOpen = true },
                 onRetry = viewModel::retryExitProbe,
                 padding = metrics.cardPadding,
+                rowPadding = metrics.rowPadding,
             )
 
             // The recent rows are content, not navigation: they fill the space
@@ -260,6 +261,9 @@ fun DashboardScreen(
                 RecentCard(
                     nodes = state.recentNodes,
                     onSelect = viewModel::selectRecentNode,
+                    rowPadding = metrics.rowPadding,
+                    rowMin = metrics.recentRowMin,
+                    headerPadding = metrics.headerPadding,
                 )
             }
 
@@ -405,7 +409,7 @@ internal fun exitCardMode(
  * may borrow the previous session's value.
  */
 @Composable
-private fun ExitZone(state: DashboardUiState, padding: Dp) {
+private fun ExitZone(state: DashboardUiState, padding: Dp, rowPadding: Dp) {
     val connected = state.connectionState == ConnectionState.CONNECTED ||
         state.connectionState == ConnectionState.WARNING
     val live = state.exit
@@ -451,7 +455,7 @@ private fun ExitZone(state: DashboardUiState, padding: Dp) {
             mode == ExitCardMode.NOT_MEASURED ||
             mode == ExitCardMode.FAILED ->
             if (startedAt != null) sessionStartedText(startedAt) else noRecord
-        startedAt != null -> lastSessionText(startedAt)
+        startedAt != null -> lastSessionValue(startedAt)
         else -> noRecord
     }
     // A previous session says so in words as well as in grey: colour on its
@@ -467,6 +471,7 @@ private fun ExitZone(state: DashboardUiState, padding: Dp) {
             value = ip,
             muted = muted,
             padding = padding,
+            rowPadding = rowPadding,
         )
         StarveilDivider(startInset = StarveilSpacing.lg)
         ExitRow(
@@ -477,13 +482,18 @@ private fun ExitZone(state: DashboardUiState, padding: Dp) {
             value = rtt,
             muted = muted,
             padding = padding,
+            rowPadding = rowPadding,
         )
         StarveilDivider(startInset = StarveilSpacing.lg)
         ExitRow(
-            label = stringResource(R.string.dashboard_exit_time),
+            label = stringResource(
+                if (stale) R.string.dashboard_exit_last_session
+                else R.string.dashboard_exit_time,
+            ),
             value = time,
             muted = muted,
             padding = padding,
+            rowPadding = rowPadding,
         )
     }
 }
@@ -502,13 +512,13 @@ private fun sessionStartedText(atEpochMs: Long): String {
 }
 
 @Composable
-private fun lastSessionText(atEpochMs: Long): String {
+private fun lastSessionValue(atEpochMs: Long): String {
     val clock = sessionClock(atEpochMs)
     return stringResource(
         if (clock.today) {
-            R.string.dashboard_exit_last_today
+            R.string.dashboard_exit_last_today_value
         } else {
-            R.string.dashboard_exit_last_date
+            R.string.dashboard_exit_last_date_value
         },
         clock.text,
     )
@@ -535,11 +545,12 @@ private fun ExitRow(
     value: String,
     muted: Boolean = false,
     padding: Dp = StarveilSpacing.lg,
+    rowPadding: Dp = StarveilSpacing.md,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = padding, vertical = StarveilSpacing.md),
+            .padding(horizontal = padding, vertical = rowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -555,7 +566,10 @@ private fun ExitRow(
             // Grey is the text's colour, not the card's opacity: a 45% card
             // fade made the latency unreadable on device.
             color = if (muted) StarveilColors.ink2 else StarveilColors.ink,
-            maxLines = 1,
+            // Two lines only when a large font makes one impossible: an
+            // ellipsised clock is a clipped clock, and the session time is the
+            // row's whole point. At the standard size this never wraps.
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1f),
@@ -770,6 +784,7 @@ private fun ConnectionCard(
     onOpenDetails: () -> Unit,
     onRetry: () -> Unit,
     padding: Dp = StarveilSpacing.lg,
+    rowPadding: Dp = StarveilSpacing.md,
 ) {
     val connected = state.connectionState == ConnectionState.CONNECTED ||
         state.connectionState == ConnectionState.WARNING
@@ -779,6 +794,7 @@ private fun ConnectionCard(
                 name = state.selectedNodeName ?: stringResource(R.string.dashboard_no_node),
                 health = state.health,
                 padding = padding,
+                rowPadding = rowPadding,
             )
         }
         StarveilDivider(startInset = StarveilSpacing.lg)
@@ -793,7 +809,7 @@ private fun ConnectionCard(
                 else -> onRetry
             },
         ) {
-            ExitZone(state = state, padding = padding)
+            ExitZone(state = state, padding = padding, rowPadding = rowPadding)
         }
     }
 }
@@ -842,11 +858,11 @@ private fun CardZone(
  * and the numbers never wrap, so a long node name cannot push them off.
  */
 @Composable
-private fun NodeZone(name: String, health: NodeHealth?, padding: Dp) {
+private fun NodeZone(name: String, health: NodeHealth?, padding: Dp, rowPadding: Dp) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = padding, vertical = StarveilSpacing.md),
+            .padding(horizontal = padding, vertical = rowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NodeName(name = name, modifier = Modifier.weight(1f))
@@ -868,12 +884,18 @@ private fun NodeZone(name: String, health: NodeHealth?, padding: Dp) {
  * title. The clock is the one glyph that says "used before" without a word.
  */
 @Composable
-private fun RecentCard(nodes: List<RecentNodeUi>, onSelect: (Long) -> Unit) {
+private fun RecentCard(
+    nodes: List<RecentNodeUi>,
+    onSelect: (Long) -> Unit,
+    rowPadding: Dp,
+    rowMin: Dp,
+    headerPadding: Dp,
+) {
     StarveilCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = StarveilSpacing.lg, vertical = StarveilSpacing.md),
+                .padding(horizontal = StarveilSpacing.lg, vertical = headerPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -891,7 +913,12 @@ private fun RecentCard(nodes: List<RecentNodeUi>, onSelect: (Long) -> Unit) {
         }
         StarveilDivider(startInset = StarveilSpacing.lg)
         nodes.forEachIndexed { index, node ->
-            RecentNodeRow(node = node, onClick = { onSelect(node.profile.id) })
+            RecentNodeRow(
+                node = node,
+                onClick = { onSelect(node.profile.id) },
+                rowPadding = rowPadding,
+                rowMin = rowMin,
+            )
             if (index != nodes.lastIndex) {
                 StarveilDivider(startInset = StarveilSpacing.lg)
             }
@@ -905,13 +932,18 @@ private fun RecentCard(nodes: List<RecentNodeUi>, onSelect: (Long) -> Unit) {
  * promise a page that does not exist.
  */
 @Composable
-private fun RecentNodeRow(node: RecentNodeUi, onClick: () -> Unit) {
+private fun RecentNodeRow(
+    node: RecentNodeUi,
+    onClick: () -> Unit,
+    rowPadding: Dp,
+    rowMin: Dp,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(role = Role.Button, onClick = onClick)
-            .heightIn(min = 48.dp)
-            .padding(horizontal = StarveilSpacing.lg, vertical = StarveilSpacing.md),
+            .heightIn(min = rowMin)
+            .padding(horizontal = StarveilSpacing.lg, vertical = rowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NodeName(name = node.profile.displayName(), modifier = Modifier.weight(1f))
@@ -992,15 +1024,18 @@ internal fun splitLeadingFlag(name: String): Pair<String?, String> {
 
 /** One line of state explanation, occupied or not. */
 /**
- * What the home page's fixed stack can afford at a given window height.
+ * What the home page's stack can afford at a given window height.
  *
- * Three steps, and only one number is sacred: the ring stays 204dp everywhere,
- * because it is the page's anchor and resizing it would move every other thing
- * on the screen. The rest — the air above it, the telemetry block, the status
- * slot, the gap before the node card, the cards' own padding — gives a little
- * at each step. A 700dp phone lands in COMPACT and fits without a scroll; a
- * 640dp one lands in SHORT and gives up the health card's second sentence,
- * which is in its dialog anyway.
+ * The tiers are stated against the space the page actually gets — the window
+ * minus the 56dp top bar and the 80dp navigation bar (and the system insets
+ * the shell adds around them). One number is sacred: the ring stays 204dp
+ * everywhere, because it is the page's anchor and resizing it would move
+ * everything else. The rest — the air above it, the traffic block, the gaps,
+ * the cards' padding and their row heights — gives a little at each step.
+ *
+ * The 360x800 phone lands in COMPACT: five blocks, three recent rows and a
+ * 204dp ring do not fit at the comfortable spacing, and the book says to take
+ * the difference out of padding and row height rather than out of the ring.
  */
 private enum class HomeTier { STANDARD, COMPACT, SHORT }
 
@@ -1009,74 +1044,72 @@ private data class HomeMetrics(
     val telemetry: Dp,
     /** The status slot's height when it has something to say. */
     val contextSlot: Dp,
+    /** The gap between the traffic block and the connection card: the largest. */
     val cardGap: Dp,
     /** The gap between the connection card and the recent card. */
     val sectionGap: Dp,
     val cardPadding: Dp,
     /** Air under the last card, before the navigation bar. */
     val bottomGap: Dp,
+    /** Vertical padding of a row inside either card. */
+    val rowPadding: Dp,
+    /** The recent rows' floor, so a row stays a touch target. */
+    val recentRowMin: Dp,
+    /** Vertical padding of the recent card's header. */
+    val headerPadding: Dp,
     /**
      * Whether an empty status slot collapses to nothing.
      *
      * True below the standard tier: the slot exists so a notice cannot move
-     * the ring, and on a screen that is short of height a 20dp hole with
-     * nothing in it is height spent on nothing. The standard tier keeps the
-     * slot at a fixed height so its composition stays pixel-identical to 0.9.6.
+     * the ring, and on a screen short of height a 24dp hole with nothing in it
+     * is height spent on nothing.
      */
     val collapseEmptySlot: Boolean,
 )
 
-/**
- * The chrome the shell draws around the page: the 56dp top bar and the 80dp
- * navigation bar. The tiers are stated against the window height — 640, 720
- * and 872dp are what a phone and the acceptance viewports actually are — and
- * the page is laid out in the window minus this.
- */
-private val CHROME_HEIGHT = 136.dp
-
 private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
-    contentHeight + CHROME_HEIGHT >= 780.dp -> HomeMetrics(
-        topGap = StarveilSpacing.xxl,
-        telemetry = TELEMETRY_HEIGHT,
-        contextSlot = CONTEXT_SLOT_HEIGHT,
-        cardGap = StarveilSpacing.xl,
-        sectionGap = StarveilSpacing.lg,
-        cardPadding = StarveilSpacing.lg,
-        bottomGap = 24.dp,
-        collapseEmptySlot = false,
-    )
-    contentHeight + CHROME_HEIGHT >= 680.dp -> HomeMetrics(
+    contentHeight >= 640.dp -> HomeMetrics(
         topGap = StarveilSpacing.md,
-        telemetry = 92.dp,
-        contextSlot = 20.dp,
-        cardGap = StarveilSpacing.sm,
+        telemetry = 84.dp,
+        contextSlot = CONTEXT_SLOT_HEIGHT,
+        cardGap = 20.dp,
         sectionGap = StarveilSpacing.md,
         cardPadding = StarveilSpacing.lg,
-        bottomGap = 12.dp,
+        bottomGap = StarveilSpacing.md,
+        rowPadding = 10.dp,
+        recentRowMin = 40.dp,
+        headerPadding = 6.dp,
         collapseEmptySlot = true,
     )
-    else -> HomeMetrics(
+    contentHeight >= 560.dp -> HomeMetrics(
         topGap = StarveilSpacing.sm,
         telemetry = 80.dp,
         contextSlot = 20.dp,
-        cardGap = StarveilSpacing.sm,
-        sectionGap = StarveilSpacing.sm,
+        cardGap = 20.dp,
+        sectionGap = StarveilSpacing.md,
+        cardPadding = StarveilSpacing.lg,
+        bottomGap = StarveilSpacing.sm,
+        rowPadding = StarveilSpacing.sm,
+        recentRowMin = 36.dp,
+        headerPadding = StarveilSpacing.xs,
+        collapseEmptySlot = true,
+    )
+    else -> HomeMetrics(
+        topGap = StarveilSpacing.xs,
+        telemetry = 76.dp,
+        contextSlot = 20.dp,
+        cardGap = StarveilSpacing.md,
+        sectionGap = StarveilSpacing.xs,
         cardPadding = StarveilSpacing.md,
-        bottomGap = 8.dp,
+        bottomGap = StarveilSpacing.xs,
+        rowPadding = 6.dp,
+        recentRowMin = 34.dp,
+        headerPadding = 4.dp,
         collapseEmptySlot = true,
     )
 }
 
 private val CONTEXT_SLOT_HEIGHT = 24.dp
-
-/** The telemetry block's height, with or without numbers: 16+8+58+4+19, rounded up. */
-private val TELEMETRY_HEIGHT = 112.dp
-
-/** The health chart never gets smaller than this. */
-private val HEALTH_MIN_HEIGHT = 96.dp
-
-/** The health header is a fixed 32 dp so the chart's share is predictable. */
-private val HEALTH_HEADER_HEIGHT = 32.dp
 
 /**
  * A condition that lasts, as opposed to a one-off confirmation.
