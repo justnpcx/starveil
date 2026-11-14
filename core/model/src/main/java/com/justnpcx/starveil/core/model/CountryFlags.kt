@@ -22,11 +22,27 @@ object CountryFlags {
     }
 
     private const val REGIONAL_INDICATOR_A = 0x1F1E6
+
+    /**
+     * The mark for a node whose country is unknown.
+     *
+     * A globe rather than nothing: every row then begins with a region mark of
+     * the same size, and "we could not place this one" is said instead of
+     * leaving the name to start in a different column.
+     */
+    const val UNKNOWN = "🌐"
 }
 
 /**
- * The name as the UI shows it: `🇺🇸 HY2+Reality`, or the plain name when the
- * country is unknown. The stored name never changes — the flag is a rendering
- * detail, so exports and backups stay exactly what the provider wrote.
+ * The name as the UI shows it: `🇺🇸 HY2+Reality`, or `🌐 npc-home` when the
+ * country could not be resolved. The stored name never changes — the mark is a
+ * rendering detail, so exports and backups stay exactly what the provider
+ * wrote.
+ *
+ * The globe is a deliberate fallback, not an error state: a node whose address
+ * is private or otherwise not in the GeoIP database still works, and a region
+ * mark on every row keeps the names starting at the same place. It is a single
+ * code point rather than a regional-indicator pair, so a caller that splits the
+ * mark off the name has to recognise it too — the dashboard's splitter does.
  */
-fun Profile.displayName(): String = CountryFlags.flag(country)?.let { "$it $name" } ?: name
+fun Profile.displayName(): String = "${CountryFlags.flag(country) ?: CountryFlags.UNKNOWN} $name"

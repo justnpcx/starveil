@@ -141,7 +141,6 @@ fun HubScreen(
             HubAboutRow(
                 title = stringResource(R.string.nav_about),
                 subtitle = stringResource(R.string.hub_about_sub),
-                version = BuildConfig.VERSION_NAME,
                 onClick = onOpenAbout,
             )
         }
@@ -219,17 +218,17 @@ private fun HubRow(
 }
 
 /**
- * The about row: the star glyph, and the version at the end of the line.
+ * The about row: the star glyph, and the same three parts as every other row.
  *
- * The version is here rather than in a footer because this is the row that
- * leads to the page where the version is explained; a second copy at the
- * bottom of the hub was the third place the same string appeared.
+ * It used to end in the version number. The version is already on the page
+ * this row opens, and this row's subtitle already says the page is about the
+ * version, so the trailing value was a third copy of one fact — the same
+ * call the GitHub row got: drop the value, keep the title.
  */
 @Composable
 private fun HubAboutRow(
     title: String,
     subtitle: String,
-    version: String,
     onClick: () -> Unit,
 ) {
     Row(
@@ -275,13 +274,6 @@ private fun HubAboutRow(
             )
         }
         Spacer(modifier = Modifier.width(StarveilSpacing.sm))
-        Text(
-            text = version,
-            style = StarveilType.label,
-            color = StarveilColors.ink2,
-            maxLines = 1,
-        )
-        Spacer(modifier = Modifier.width(StarveilSpacing.xs))
         Icon(
             imageVector = StarveilIcons.Chevron,
             contentDescription = null,

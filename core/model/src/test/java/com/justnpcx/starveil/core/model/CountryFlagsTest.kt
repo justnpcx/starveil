@@ -32,6 +32,9 @@ class CountryFlagsTest {
         )
         assertEquals("🇺🇸 HY2+Reality", known.displayName())
 
-        assertEquals("HY2+Reality", known.copy(country = null).displayName())
+        // A node the GeoIP database cannot place gets the globe, not a bare
+        // name: every row starts with a region mark of the same size.
+        assertEquals("🌐 HY2+Reality", known.copy(country = null).displayName())
+        assertEquals("🌐 HY2+Reality", known.copy(country = "not a code").displayName())
     }
 }

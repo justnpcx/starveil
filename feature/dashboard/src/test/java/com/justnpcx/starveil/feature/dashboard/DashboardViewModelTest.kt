@@ -102,7 +102,7 @@ class DashboardViewModelTest {
 
         preferences.setSelectedProfileId(TWO)
 
-        assertEquals("two", viewModel.uiState.value.selectedNodeName)
+        assertEquals(nodeName("two"), viewModel.uiState.value.selectedNodeName)
         assertEquals(ConnectionState.CONNECTED, viewModel.uiState.value.connectionState)
         assertEquals(2, kernel.starts)
         assertTrue(kernel.lastConfig.orEmpty().contains("\"server\":\"two.example\""))
@@ -189,7 +189,7 @@ class DashboardViewModelTest {
 
         preferences.setSelectedProfileId(TWO)
 
-        assertEquals("two", viewModel.uiState.value.selectedNodeName)
+        assertEquals(nodeName("two"), viewModel.uiState.value.selectedNodeName)
         assertEquals(0, kernel.starts)
     }
 
@@ -296,7 +296,7 @@ class DashboardViewModelTest {
         yield()
 
         assertEquals(ConnectionState.CONNECTED, viewModel.uiState.value.connectionState)
-        assertEquals("one", viewModel.uiState.value.selectedNodeName)
+        assertEquals(nodeName("one"), viewModel.uiState.value.selectedNodeName)
     }
 
     @Test
@@ -967,6 +967,12 @@ class DashboardViewModelTest {
         override suspend fun ensure(ids: Set<String>) = emptyList<InstalledRulePack>()
         override val failure: StateFlow<RulePackFailure?> = MutableStateFlow(null)
     }
+
+    /**
+     * A node name as the UI shows it. These fixtures have no country, so the
+     * name carries the globe every unresolvable node gets.
+     */
+    private fun nodeName(name: String) = "${CountryFlags.UNKNOWN} $name"
 
     private fun profile(id: Long, name: String, country: String? = null) = Profile(
         id = id,

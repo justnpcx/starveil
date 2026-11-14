@@ -21,14 +21,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import com.justnpcx.starveil.core.ui.icons.StarveilIcons
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -58,7 +59,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.justnpcx.starveil.core.data.preferences.ExitSnapshot
 import com.justnpcx.starveil.core.kernel.TrafficStats
+import com.justnpcx.starveil.core.model.CountryFlags
 import com.justnpcx.starveil.core.model.NodeHealth
 import com.justnpcx.starveil.core.model.displayName
 import com.justnpcx.starveil.core.model.RecommendationReason
@@ -76,6 +79,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 import kotlin.math.round
 import kotlin.math.roundToInt
 
@@ -115,10 +119,22 @@ fun DashboardScreen(
         }
     }
     val snackbar = remember { SnackbarHostState() }
+    // One-off feedback that is not a state change: the same Snackbar the
+    // notices use, raised from a tap rather than from the view model.
+    val scope = rememberCoroutineScope()
     // The notice whose details are open, if any. Held here rather than in the
     // view model: it is whether a dialog is showing, not what the app knows.
     var details by remember { mutableStateOf<DashboardNotice?>(null) }
     var exitOpen by remember { mutableStateOf(false) }
+    val cannotProbe = stringResource(R.string.dashboard_exit_not_connected)
+    // The dialog describes a live measurement. When the tunnel goes down there
+    // is nothing live left to describe, so the dialog closes with it instead
+    // of hanging over a card that has fallen back to the last session.
+    val connected = state.connectionState == ConnectionState.CONNECTED ||
+        state.connectionState == ConnectionState.WARNING
+    LaunchedEffect(exitOpen, connected, state.exit) {
+        if (exitOpen && (!connected || state.exit == null)) exitOpen = false
+    }
 
     // A persistent notice is a condition that lasts until something changes —
     // it gets the fixed slot. Everything else is a one-off confirmation and
@@ -247,6 +263,18 @@ fun DashboardScreen(
                 onOpenNodes = onOpenNodes,
                 onOpenDetails = { exitOpen = true },
                 onRetry = viewModel::retryExitProbe,
+                // With no tunnel there is nothing to probe through: asking
+                // would go out directly and overwrite the last session's
+                // snapshot with a measurement of the phone's own connection.
+                // Say so instead, and leave the snapshot alone.
+                onCannotProbe = {
+                    scope.launch {
+                        snackbar.showSnackbar(
+                            cannotProbe,
+                            duration = SnackbarDuration.Short,
+                        )
+                    }
+                },
                 padding = metrics.cardPadding,
                 rowPadding = metrics.rowPadding,
             )
@@ -263,7 +291,6 @@ fun DashboardScreen(
                     onSelect = viewModel::selectRecentNode,
                     rowPadding = metrics.rowPadding,
                     rowMin = metrics.recentRowMin,
-                    headerPadding = metrics.headerPadding,
                 )
             }
 
@@ -286,7 +313,13 @@ fun DashboardScreen(
 
         if (exitOpen) {
             state.exit?.let { exit ->
-                ExitDetailsDialog(exit = exit, onDismiss = { exitOpen = false })
+                ExitDetailsDialog(
+                    exit = exit,
+                    smoothedRttMs = state.exitSmoothedRttMs,
+                    sessionStartedAt = state.sessionStartedAt,
+                    lastExit = state.lastExit,
+                    onDismiss = { exitOpen = false },
+                )
             }
         }
     }
@@ -336,20 +369,26 @@ private fun FailureDetailsDialog(notice: DashboardNotice, onDismiss: () -> Unit)
 }
 
 /**
- * What the exit line measured, in full.
+ * What the exit measured, in full, live and last.
  *
  * The number on the home screen is one line and has to stay one line; this is
- * where "which address, how long, and when" lives. The round trip includes DNS
- * and TLS, which is why it is called a round trip and not a ping.
+ * where "which address, how long, and when" lives. The three live rows are the
+ * card's own three, so the two readings agree. Below them the last completed
+ * session is kept: the card shows the snapshot when the tunnel is down, and
+ * while it is up this is the only place the previous session can be read. The
+ * round trip includes DNS and TLS, which is why it is called a round trip and
+ * not a ping.
  */
 @Composable
 private fun ExitDetailsDialog(
     exit: com.justnpcx.starveil.core.data.network.ExitInfo,
+    smoothedRttMs: Long?,
+    sessionStartedAt: Long?,
+    lastExit: ExitSnapshot?,
     onDismiss: () -> Unit,
 ) {
-    val time = remember(exit.atEpochMs) {
-        java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(java.util.Date(exit.atEpochMs))
-    }
+    val started = sessionStartedAt?.takeIf { it > 0 }
+    val lastStarted = lastExit?.sessionStartedAt?.takeIf { it > 0 }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dashboard_exit_details_title)) },
@@ -357,15 +396,49 @@ private fun ExitDetailsDialog(
             Column(verticalArrangement = Arrangement.spacedBy(StarveilSpacing.sm)) {
                 DetailLine(stringResource(R.string.dashboard_exit_address), exit.address)
                 DetailLine(
-                    stringResource(R.string.dashboard_exit_rtt),
-                    stringResource(R.string.dashboard_exit_rtt_value, exit.rttMs),
+                    stringResource(R.string.dashboard_exit_rtt_smoothed),
+                    stringResource(
+                        R.string.dashboard_exit_rtt_value,
+                        smoothedRttMs ?: exit.rttMs,
+                    ),
                 )
-                DetailLine(stringResource(R.string.dashboard_exit_measured), time)
+                DetailLine(
+                    stringResource(R.string.dashboard_exit_time),
+                    started?.let { sessionStartedText(it) }
+                        ?: stringResource(R.string.dashboard_exit_no_record),
+                )
                 Text(
                     text = stringResource(R.string.dashboard_exit_note),
                     style = StarveilType.tech,
                     color = StarveilColors.ink3,
                 )
+                StarveilDivider(startInset = 0.dp)
+                Text(
+                    text = stringResource(R.string.dashboard_exit_last_session).uppercase(),
+                    style = StarveilType.tech,
+                    color = StarveilColors.ink2,
+                )
+                if (lastExit == null) {
+                    Text(
+                        text = stringResource(R.string.dashboard_exit_last_empty),
+                        style = StarveilType.label,
+                        color = StarveilColors.ink2,
+                    )
+                } else {
+                    DetailLine(
+                        stringResource(R.string.dashboard_exit_last_address),
+                        lastExit.address,
+                    )
+                    DetailLine(
+                        stringResource(R.string.dashboard_exit_last_latency),
+                        stringResource(R.string.dashboard_exit_rtt_value, lastExit.rttMs),
+                    )
+                    DetailLine(
+                        stringResource(R.string.dashboard_exit_time),
+                        lastStarted?.let { lastSessionValue(it) }
+                            ?: stringResource(R.string.dashboard_exit_no_record),
+                    )
+                }
             }
         },
         confirmButton = {
@@ -783,6 +856,7 @@ private fun ConnectionCard(
     onOpenNodes: () -> Unit,
     onOpenDetails: () -> Unit,
     onRetry: () -> Unit,
+    onCannotProbe: () -> Unit,
     padding: Dp = StarveilSpacing.lg,
     rowPadding: Dp = StarveilSpacing.md,
 ) {
@@ -799,14 +873,16 @@ private fun ConnectionCard(
         }
         StarveilDivider(startInset = StarveilSpacing.lg)
         // A tap on the exit is about the exit: while the tunnel is up it opens
-        // the measurement, or retries one that has not answered; while it is
-        // down it asks the probe again. It never promotes the stored snapshot
-        // to a live value.
+        // the measurement, or retries one that has not answered. While it is
+        // down it says there is nothing to probe — the snapshot below is the
+        // last session's, and a probe without a tunnel would replace it with a
+        // direct-connection reading. It never promotes the stored snapshot to
+        // a live value.
         CardZone(
             onClick = when {
                 connected && state.exit == null -> onRetry
                 connected -> onOpenDetails
-                else -> onRetry
+                else -> onCannotProbe
             },
         ) {
             ExitZone(state = state, padding = padding, rowPadding = rowPadding)
@@ -877,11 +953,12 @@ private fun NodeZone(name: String, health: NodeHealth?, padding: Dp, rowPadding:
 }
 
 /**
- * The recent rows, with their own header.
+ * The recent rows, without a header.
  *
- * The header lives inside the card: "Recent" was a caption floating above a
- * card, which read as a section of the page rather than as the card's own
- * title. The clock is the one glyph that says "used before" without a word.
+ * The card had a clock glyph and a "Recent" caption, which cost about 28dp of
+ * the one screen the page must fit on. The rows are the card's whole content
+ * and each one is a node the app has used; the caption named what the rows
+ * already are, so it went and the first row now meets the card's top edge.
  */
 @Composable
 private fun RecentCard(
@@ -889,29 +966,8 @@ private fun RecentCard(
     onSelect: (Long) -> Unit,
     rowPadding: Dp,
     rowMin: Dp,
-    headerPadding: Dp,
 ) {
     StarveilCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = StarveilSpacing.lg, vertical = headerPadding),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = StarveilIcons.Clock,
-                contentDescription = null,
-                tint = StarveilColors.ink2,
-                modifier = Modifier.size(14.dp),
-            )
-            Spacer(modifier = Modifier.width(StarveilSpacing.sm))
-            Text(
-                text = stringResource(R.string.dashboard_recent_title).uppercase(),
-                style = StarveilType.tech,
-                color = StarveilColors.ink2,
-            )
-        }
-        StarveilDivider(startInset = StarveilSpacing.lg)
         nodes.forEachIndexed { index, node ->
             RecentNodeRow(
                 node = node,
@@ -972,27 +1028,30 @@ private fun healthLine(health: NodeHealth?): String {
 }
 
 /**
- * A node's name, with a leading flag at 22sp.
+ * A node's name, with its region mark as a quiet prefix.
  *
- * `Profile.displayName()` puts the flag in the string, and a flag at 17sp reads
- * as punctuation. Splitting it out is a display rule, not a data one: nothing
- * outside this function knows the flag was ever separate.
+ * The name is running text at [StarveilType.body], not a heading. It was 17sp
+ * semibold with the flag at 22sp — the identifier and its decoration were the
+ * loudest things in the card, while the facts a reader actually came for (the
+ * exit address, the latency) are 11sp. The scale was upside down. The mark is
+ * now a 14dp circular badge the size of the name's line: a prefix, not a
+ * picture. A flag at 17sp read as punctuation; a 14dp circle reads as a mark.
+ *
+ * `Profile.displayName()` puts the mark in the string, and splitting it out is
+ * a display rule, not a data one: nothing outside this function knows the mark
+ * was ever separate.
  */
 @Composable
 private fun NodeName(name: String, modifier: Modifier = Modifier) {
-    val (flag, rest) = splitLeadingFlag(name)
+    val (mark, rest) = splitRegionMark(name)
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (flag != null) {
-            Text(
-                text = flag,
-                fontSize = 22.sp,
-                color = StarveilColors.ink,
-            )
+        if (mark != null) {
+            RegionMark(mark)
             Spacer(modifier = Modifier.width(StarveilSpacing.sm))
         }
         Text(
             text = rest,
-            style = StarveilType.headline,
+            style = StarveilType.body,
             color = StarveilColors.ink,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1003,24 +1062,73 @@ private fun NodeName(name: String, modifier: Modifier = Modifier) {
     }
 }
 
+/** The badge's diameter: the name's line box, so the mark sits inside the line. */
+private val REGION_MARK_SIZE = 14.dp
+
 /**
- * Splits a leading pair of regional-indicator symbols off a name.
+ * A node's region, as a circular badge the size of the name's line.
  *
- * Returns (flag, rest), or (null, name) when the name does not start with one.
- * The pair is two code points; a name that begins with a single one is not a
- * flag and is left alone.
+ * A flag emoji is wider than it is tall. Scaling it to the badge's height and
+ * cropping the overhang to a circle keeps its proportions — no stretching, and
+ * the stripes and star field are still recognisable — while making every mark
+ * the same size as every other. Both are set at the same type size in the same
+ * 14dp square; the flag is cropped to the circle and the globe, already round,
+ * is not.
  */
-internal fun splitLeadingFlag(name: String): Pair<String?, String> {
+@Composable
+private fun RegionMark(mark: String) {
+    val globe = mark == CountryFlags.UNKNOWN
+    Box(
+        modifier = Modifier
+            .size(REGION_MARK_SIZE)
+            // A globe is already round, so cropping it would only take ink
+            // away; a flag is a rectangle and gets the circle.
+            .then(if (globe) Modifier else Modifier.clip(CircleShape)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = mark,
+            // A flag's artwork does not fill its em square, so the glyph is
+            // set larger than the badge to make its ink reach the badge's
+            // height; the box crops the overhang to the circle. The globe is
+            // set the same way, which is what makes the two look the same
+            // size rather than merely being in the same box.
+            fontSize = 16.sp,
+            lineHeight = 14.sp,
+            color = StarveilColors.ink,
+            maxLines = 1,
+            softWrap = false,
+            // Measured unbounded so the glyph keeps its natural width and
+            // overflows the square evenly instead of being squeezed.
+            modifier = Modifier.wrapContentWidth(unbounded = true),
+        )
+    }
+}
+
+/**
+ * Splits a leading region mark off a name.
+ *
+ * The mark is a pair of regional-indicator symbols (a flag), or the single
+ * globe the unknown-country fallback uses. Returns (mark, rest), or
+ * (null, name) when the name does not start with one.
+ */
+internal fun splitRegionMark(name: String): Pair<String?, String> {
     val points = name.codePoints().toArray()
     if (points.size < 3) return null to name
-    val first = points[0]
-    val second = points[1]
     val isIndicator = { cp: Int -> cp in 0x1F1E6..0x1F1FF }
-    if (!isIndicator(first) || !isIndicator(second)) return null to name
-    val flag = String(points, 0, 2)
-    val rest = String(points, 2, points.size - 2).trim()
-    return flag to rest
+    val length = when {
+        isIndicator(points[0]) && isIndicator(points[1]) -> 2
+        points[0] == GLOBE -> 1
+        else -> 0
+    }
+    if (length == 0) return null to name
+    val mark = String(points, 0, length)
+    val rest = String(points, length, points.size - length).trim()
+    return mark to rest
 }
+
+/** U+1F310, the globe the display name falls back to. */
+private const val GLOBE = 0x1F310
 
 /** One line of state explanation, occupied or not. */
 /**
@@ -1055,8 +1163,6 @@ private data class HomeMetrics(
     val rowPadding: Dp,
     /** The recent rows' floor, so a row stays a touch target. */
     val recentRowMin: Dp,
-    /** Vertical padding of the recent card's header. */
-    val headerPadding: Dp,
     /**
      * Whether an empty status slot collapses to nothing.
      *
@@ -1078,7 +1184,6 @@ private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
         bottomGap = StarveilSpacing.md,
         rowPadding = 10.dp,
         recentRowMin = 40.dp,
-        headerPadding = 6.dp,
         collapseEmptySlot = true,
     )
     contentHeight >= 560.dp -> HomeMetrics(
@@ -1091,7 +1196,6 @@ private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
         bottomGap = StarveilSpacing.sm,
         rowPadding = StarveilSpacing.sm,
         recentRowMin = 36.dp,
-        headerPadding = StarveilSpacing.xs,
         collapseEmptySlot = true,
     )
     else -> HomeMetrics(
@@ -1104,7 +1208,6 @@ private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
         bottomGap = StarveilSpacing.xs,
         rowPadding = 6.dp,
         recentRowMin = 34.dp,
-        headerPadding = 4.dp,
         collapseEmptySlot = true,
     )
 }

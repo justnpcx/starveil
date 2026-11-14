@@ -58,9 +58,9 @@
     <string name="dashboard_exit_address">出口 IP</string>
     <string name="dashboard_exit_rtt_smoothed">出口延遲</string>
     <string name="dashboard_exit_unmeasured">出口未測得 · 點按重試</string>
+    <string name="dashboard_exit_not_connected">未連線，無法探測</string>
     <string name="dashboard_exit_rtt">往返延遲</string>
     <string name="dashboard_exit_rtt_value">%1$d ms</string>
-    <string name="dashboard_exit_measured">偵測時間</string>
     <string name="dashboard_exit_note">往返延遲包含一次第三方請求的 DNS、連線與 TLS 耗時，不是 ping。</string>
 
     <string name="dashboard_exit_time">時間</string>
@@ -68,12 +68,12 @@
     <string name="dashboard_exit_no_record">暫無記錄</string>
     <string name="dashboard_exit_session_today">今天 %1$s 開始 · 進行中</string>
     <string name="dashboard_exit_session_date">%1$s 開始 · 進行中</string>
-    <string name="dashboard_recent_title">最近使用</string>
     <string name="dashboard_recent_health">%1$d ms · 線上 %2$d%%</string>
     <string name="dashboard_recent_untested">未測得</string>
     <string name="dashboard_exit_last_address">上次出口 IP</string>
     <string name="dashboard_exit_last_latency">上次出口延遲</string>
     <string name="dashboard_exit_last_session">上次會話</string>
+    <string name="dashboard_exit_last_empty">暫無上次會話</string>
     <string name="dashboard_exit_last_today_value">今天 %1$s</string>
     <string name="dashboard_exit_last_date_value">%1$s</string>
 </resources>

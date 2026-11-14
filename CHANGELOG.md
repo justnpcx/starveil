@@ -8,6 +8,29 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.31] — 2026-11-14
+
+### Changed
+
+- **The recent card lost its header.** The clock glyph and the "Recent"
+  caption are gone, so the first row meets the card's top edge and the page
+  fits a 360×800 window with three recent rows without scrolling.
+- **The node name and its flag came down the scale.** The name is 14sp body
+  text and the region mark a 14dp circular badge — flags are centre-cropped to
+  the circle, and a node whose country cannot be resolved shows a globe of the
+  same size instead of no mark at all.
+- **The exit dialog shows the previous session.** Below the live rows it lists
+  the last session's exit IP, latency and start time, or says there is none
+  yet.
+- **The hub's About row no longer ends in the version number**, which the
+  About page already shows.
+
+### Fixed
+
+- Tapping the exit while disconnected now says it cannot probe, instead of
+  doing nothing. It still does not probe: without a tunnel a probe would
+  measure the phone's own connection and overwrite the last session.
+
 ## [0.9.30] — 2026-11-14
 
 ### Changed
