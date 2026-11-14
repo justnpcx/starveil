@@ -61,7 +61,6 @@
     <string name="dashboard_exit_not_connected">未连接，无法探测</string>
     <string name="dashboard_exit_rtt">往返时延</string>
     <string name="dashboard_exit_rtt_value">%1$d ms</string>
-    <string name="dashboard_exit_measured">检测时间</string>
     <string name="dashboard_exit_note">往返时延包含一次第三方请求的 DNS、连接与 TLS 耗时，不是 ping。</string>
 
     <string name="dashboard_exit_time">时间</string>
@@ -74,6 +73,7 @@
     <string name="dashboard_exit_last_address">上次出口 IP</string>
     <string name="dashboard_exit_last_latency">上次出口延迟</string>
     <string name="dashboard_exit_last_session">上次会话</string>
+    <string name="dashboard_exit_last_empty">暂无上次会话</string>
     <string name="dashboard_exit_last_today_value">今天 %1$s</string>
     <string name="dashboard_exit_last_date_value">%1$s</string>
 </resources>

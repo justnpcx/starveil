@@ -67,7 +67,6 @@
     <string name="dashboard_exit_not_connected">Not connected · cannot probe</string>
     <string name="dashboard_exit_rtt">Round trip</string>
     <string name="dashboard_exit_rtt_value">%1$d ms</string>
-    <string name="dashboard_exit_measured">Measured at</string>
     <string name="dashboard_exit_note">The round trip covers DNS, the connection and TLS for one request to a third party — it is not a ping.</string>
 
     <!-- The four destinations the bottom bar does not reach. -->
@@ -81,6 +80,7 @@
     <string name="dashboard_exit_last_address">Last exit IP</string>
     <string name="dashboard_exit_last_latency">Last exit latency</string>
     <string name="dashboard_exit_last_session">Last session</string>
+    <string name="dashboard_exit_last_empty">No previous session</string>
     <string name="dashboard_exit_last_today_value">today %1$s</string>
     <string name="dashboard_exit_last_date_value">%1$s</string>
 </resources>

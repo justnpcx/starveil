@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.justnpcx.starveil.core.data.preferences.ExitSnapshot
 import com.justnpcx.starveil.core.kernel.TrafficStats
 import com.justnpcx.starveil.core.model.NodeHealth
 import com.justnpcx.starveil.core.model.displayName
@@ -122,6 +123,14 @@ fun DashboardScreen(
     var details by remember { mutableStateOf<DashboardNotice?>(null) }
     var exitOpen by remember { mutableStateOf(false) }
     val cannotProbe = stringResource(R.string.dashboard_exit_not_connected)
+    // The dialog describes a live measurement. When the tunnel goes down there
+    // is nothing live left to describe, so the dialog closes with it instead
+    // of hanging over a card that has fallen back to the last session.
+    val connected = state.connectionState == ConnectionState.CONNECTED ||
+        state.connectionState == ConnectionState.WARNING
+    LaunchedEffect(exitOpen, connected, state.exit) {
+        if (exitOpen && (!connected || state.exit == null)) exitOpen = false
+    }
 
     // A persistent notice is a condition that lasts until something changes —
     // it gets the fixed slot. Everything else is a one-off confirmation and
@@ -300,7 +309,13 @@ fun DashboardScreen(
 
         if (exitOpen) {
             state.exit?.let { exit ->
-                ExitDetailsDialog(exit = exit, onDismiss = { exitOpen = false })
+                ExitDetailsDialog(
+                    exit = exit,
+                    smoothedRttMs = state.exitSmoothedRttMs,
+                    sessionStartedAt = state.sessionStartedAt,
+                    lastExit = state.lastExit,
+                    onDismiss = { exitOpen = false },
+                )
             }
         }
     }
@@ -350,20 +365,26 @@ private fun FailureDetailsDialog(notice: DashboardNotice, onDismiss: () -> Unit)
 }
 
 /**
- * What the exit line measured, in full.
+ * What the exit measured, in full, live and last.
  *
  * The number on the home screen is one line and has to stay one line; this is
- * where "which address, how long, and when" lives. The round trip includes DNS
- * and TLS, which is why it is called a round trip and not a ping.
+ * where "which address, how long, and when" lives. The three live rows are the
+ * card's own three, so the two readings agree. Below them the last completed
+ * session is kept: the card shows the snapshot when the tunnel is down, and
+ * while it is up this is the only place the previous session can be read. The
+ * round trip includes DNS and TLS, which is why it is called a round trip and
+ * not a ping.
  */
 @Composable
 private fun ExitDetailsDialog(
     exit: com.justnpcx.starveil.core.data.network.ExitInfo,
+    smoothedRttMs: Long?,
+    sessionStartedAt: Long?,
+    lastExit: ExitSnapshot?,
     onDismiss: () -> Unit,
 ) {
-    val time = remember(exit.atEpochMs) {
-        java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(java.util.Date(exit.atEpochMs))
-    }
+    val started = sessionStartedAt?.takeIf { it > 0 }
+    val lastStarted = lastExit?.sessionStartedAt?.takeIf { it > 0 }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dashboard_exit_details_title)) },
@@ -371,15 +392,49 @@ private fun ExitDetailsDialog(
             Column(verticalArrangement = Arrangement.spacedBy(StarveilSpacing.sm)) {
                 DetailLine(stringResource(R.string.dashboard_exit_address), exit.address)
                 DetailLine(
-                    stringResource(R.string.dashboard_exit_rtt),
-                    stringResource(R.string.dashboard_exit_rtt_value, exit.rttMs),
+                    stringResource(R.string.dashboard_exit_rtt_smoothed),
+                    stringResource(
+                        R.string.dashboard_exit_rtt_value,
+                        smoothedRttMs ?: exit.rttMs,
+                    ),
                 )
-                DetailLine(stringResource(R.string.dashboard_exit_measured), time)
+                DetailLine(
+                    stringResource(R.string.dashboard_exit_time),
+                    started?.let { sessionStartedText(it) }
+                        ?: stringResource(R.string.dashboard_exit_no_record),
+                )
                 Text(
                     text = stringResource(R.string.dashboard_exit_note),
                     style = StarveilType.tech,
                     color = StarveilColors.ink3,
                 )
+                StarveilDivider(startInset = 0.dp)
+                Text(
+                    text = stringResource(R.string.dashboard_exit_last_session).uppercase(),
+                    style = StarveilType.tech,
+                    color = StarveilColors.ink2,
+                )
+                if (lastExit == null) {
+                    Text(
+                        text = stringResource(R.string.dashboard_exit_last_empty),
+                        style = StarveilType.label,
+                        color = StarveilColors.ink2,
+                    )
+                } else {
+                    DetailLine(
+                        stringResource(R.string.dashboard_exit_last_address),
+                        lastExit.address,
+                    )
+                    DetailLine(
+                        stringResource(R.string.dashboard_exit_last_latency),
+                        stringResource(R.string.dashboard_exit_rtt_value, lastExit.rttMs),
+                    )
+                    DetailLine(
+                        stringResource(R.string.dashboard_exit_time),
+                        lastStarted?.let { lastSessionValue(it) }
+                            ?: stringResource(R.string.dashboard_exit_no_record),
+                    )
+                }
             }
         },
         confirmButton = {
