@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -73,6 +74,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 import kotlin.math.round
 import kotlin.math.roundToInt
 
@@ -112,10 +114,14 @@ fun DashboardScreen(
         }
     }
     val snackbar = remember { SnackbarHostState() }
+    // One-off feedback that is not a state change: the same Snackbar the
+    // notices use, raised from a tap rather than from the view model.
+    val scope = rememberCoroutineScope()
     // The notice whose details are open, if any. Held here rather than in the
     // view model: it is whether a dialog is showing, not what the app knows.
     var details by remember { mutableStateOf<DashboardNotice?>(null) }
     var exitOpen by remember { mutableStateOf(false) }
+    val cannotProbe = stringResource(R.string.dashboard_exit_not_connected)
 
     // A persistent notice is a condition that lasts until something changes —
     // it gets the fixed slot. Everything else is a one-off confirmation and
@@ -244,6 +250,18 @@ fun DashboardScreen(
                 onOpenNodes = onOpenNodes,
                 onOpenDetails = { exitOpen = true },
                 onRetry = viewModel::retryExitProbe,
+                // With no tunnel there is nothing to probe through: asking
+                // would go out directly and overwrite the last session's
+                // snapshot with a measurement of the phone's own connection.
+                // Say so instead, and leave the snapshot alone.
+                onCannotProbe = {
+                    scope.launch {
+                        snackbar.showSnackbar(
+                            cannotProbe,
+                            duration = SnackbarDuration.Short,
+                        )
+                    }
+                },
                 padding = metrics.cardPadding,
                 rowPadding = metrics.rowPadding,
             )
@@ -779,6 +797,7 @@ private fun ConnectionCard(
     onOpenNodes: () -> Unit,
     onOpenDetails: () -> Unit,
     onRetry: () -> Unit,
+    onCannotProbe: () -> Unit,
     padding: Dp = StarveilSpacing.lg,
     rowPadding: Dp = StarveilSpacing.md,
 ) {
@@ -795,14 +814,16 @@ private fun ConnectionCard(
         }
         StarveilDivider(startInset = StarveilSpacing.lg)
         // A tap on the exit is about the exit: while the tunnel is up it opens
-        // the measurement, or retries one that has not answered; while it is
-        // down it asks the probe again. It never promotes the stored snapshot
-        // to a live value.
+        // the measurement, or retries one that has not answered. While it is
+        // down it says there is nothing to probe — the snapshot below is the
+        // last session's, and a probe without a tunnel would replace it with a
+        // direct-connection reading. It never promotes the stored snapshot to
+        // a live value.
         CardZone(
             onClick = when {
                 connected && state.exit == null -> onRetry
                 connected -> onOpenDetails
-                else -> onRetry
+                else -> onCannotProbe
             },
         ) {
             ExitZone(state = state, padding = padding, rowPadding = rowPadding)
