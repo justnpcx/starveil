@@ -1024,11 +1024,19 @@ private fun healthLine(health: NodeHealth?): String {
 }
 
 /**
- * A node's name, with a leading flag at 22sp.
+ * A node's name, with its region mark as a quiet prefix.
  *
- * `Profile.displayName()` puts the flag in the string, and a flag at 17sp reads
- * as punctuation. Splitting it out is a display rule, not a data one: nothing
- * outside this function knows the flag was ever separate.
+ * The name is running text at [StarveilType.body], not a heading. It was 17sp
+ * semibold with the flag at 22sp — the identifier and its decoration were the
+ * loudest things in the card, while the facts a reader actually came for (the
+ * exit address, the latency) are 11sp. The scale was upside down. The flag is
+ * now the same size as the name and reads as a prefix rather than a picture:
+ * a flag at 17sp read as punctuation, and at 14sp it is simply part of the
+ * line.
+ *
+ * `Profile.displayName()` puts the mark in the string, and splitting it out is
+ * a display rule, not a data one: nothing outside this function knows the flag
+ * was ever separate.
  */
 @Composable
 private fun NodeName(name: String, modifier: Modifier = Modifier) {
@@ -1037,14 +1045,15 @@ private fun NodeName(name: String, modifier: Modifier = Modifier) {
         if (flag != null) {
             Text(
                 text = flag,
-                fontSize = 22.sp,
+                fontSize = 14.sp,
+                lineHeight = 14.sp,
                 color = StarveilColors.ink,
             )
             Spacer(modifier = Modifier.width(StarveilSpacing.sm))
         }
         Text(
             text = rest,
-            style = StarveilType.headline,
+            style = StarveilType.body,
             color = StarveilColors.ink,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
