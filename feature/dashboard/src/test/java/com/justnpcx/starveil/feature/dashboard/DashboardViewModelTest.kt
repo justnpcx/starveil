@@ -15,6 +15,7 @@ import com.justnpcx.starveil.core.data.ruleset.RuleSetFailure
 import com.justnpcx.starveil.core.model.InstalledRulePack
 import com.justnpcx.starveil.core.data.repository.GroupRepository
 import com.justnpcx.starveil.core.data.repository.NodeHealthRepository
+import com.justnpcx.starveil.core.data.repository.NodeAutoPicker
 import com.justnpcx.starveil.core.data.repository.ProfileRepository
 import com.justnpcx.starveil.core.data.scene.SceneApplyState
 import com.justnpcx.starveil.core.data.repository.RuleRepository
@@ -936,7 +937,12 @@ class DashboardViewModelTest {
             groups = groups,
             connection = connection,
             nodeHealth = nodeHealth,
-            recovery = DropRecovery(profiles, nodeHealth, preferences),
+            recovery = DropRecovery(
+                profiles,
+                nodeHealth,
+                preferences,
+                NodeAutoPicker(profiles, nodeHealth, preferences),
+            ),
             sceneApply = SceneApplyState(),
             exitProbe = exitProbe,
         )

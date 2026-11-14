@@ -2,6 +2,7 @@ package com.justnpcx.starveil.feature.dashboard
 
 import com.justnpcx.starveil.core.data.preferences.ConnectionTarget
 import com.justnpcx.starveil.core.data.preferences.PreferencesRepository
+import com.justnpcx.starveil.core.data.repository.NodeAutoPicker
 import com.justnpcx.starveil.core.data.repository.NodeHealthRepository
 import com.justnpcx.starveil.core.data.repository.ProfileRepository
 import com.justnpcx.starveil.core.model.AppRoute
@@ -34,7 +35,12 @@ class DropRecoveryTest {
     private fun recovery(
         nodes: List<Profile> = listOf(tokyo, osaka),
         preferences: DropFakePrefs = DropFakePrefs(),
-    ) = DropRecovery(DropFakeProfiles(nodes), DropNoHealth, preferences)
+    ) = DropRecovery(
+        DropFakeProfiles(nodes),
+        DropNoHealth,
+        preferences,
+        NodeAutoPicker(DropFakeProfiles(nodes), DropNoHealth, preferences),
+    )
 
     @Test
     fun `a crash while disconnected is not a lost tunnel`() = runBlocking {

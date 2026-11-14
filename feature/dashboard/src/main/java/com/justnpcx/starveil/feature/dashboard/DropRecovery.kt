@@ -2,7 +2,9 @@ package com.justnpcx.starveil.feature.dashboard
 
 import com.justnpcx.starveil.core.data.preferences.ConnectionTarget
 import com.justnpcx.starveil.core.data.preferences.PreferencesRepository
+import com.justnpcx.starveil.core.data.repository.NodeAutoPicker
 import com.justnpcx.starveil.core.data.repository.NodeHealthRepository
+import com.justnpcx.starveil.core.data.repository.preferredRegionOf
 import com.justnpcx.starveil.core.data.repository.ProfileRepository
 import com.justnpcx.starveil.core.model.AutoPick
 import com.justnpcx.starveil.core.model.NodeCandidate
@@ -29,6 +31,12 @@ class DropRecovery @Inject constructor(
     private val profiles: ProfileRepository,
     private val nodeHealth: NodeHealthRepository,
     private val preferences: PreferencesRepository,
+    /**
+     * The same picker the Nodes page's selection row uses. The decision itself
+     * lives there so the two entry points cannot drift; nothing about *this*
+     * class's recovery policy changed.
+     */
+    private val autoPicker: NodeAutoPicker,
 ) {
 
     sealed interface Decision {
@@ -89,59 +97,20 @@ class DropRecovery @Inject constructor(
     /**
      * The picker's answer plus the stickiness decision, against the node in force.
      *
-     * Separate from [best] because the dashboard's button needs the *decision*
-     * and the numbers behind it: a pick that does not beat the current node by
-     * [STICKINESS_MARGIN] is deliberately not a switch, and the log has to be
-     * able to say so.
+     * Delegates to [NodeAutoPicker]: the same call the Nodes page makes when
+     * the user switches the selection row to automatic.
      */
-    suspend fun autoPick(): AutoPick? {
-        val nodes = profiles.observeAll().first()
-        if (nodes.isEmpty()) return null
-        val samples = nodeHealth.observeAll().first()
-        val currentId = preferences.selectedProfileId.first().takeIf { it != 0L }
-        return decide(
-            candidates = nodes.map { profile ->
-                NodeCandidate(
-                    profileId = profile.id,
-                    region = NodeRegions.resolve(profile.name, profile.country),
-                    health = samples[profile.id]?.let(::nodeHealthOf),
-                )
-            },
-            currentId = currentId,
-            preferredRegion = preferredRegion(nodes, currentId),
-            nowMs = System.currentTimeMillis(),
-        )
-    }
+    suspend fun autoPick(): AutoPick? = autoPicker.pick()
 
     private suspend fun nextBest(exclude: Long): NodeRecommendation? =
         recommend(exclude)?.takeIf { it.profileId != exclude }
-
-    /**
-     * The preferred region is the region of the node the user already chose:
-     * that is the only manual preference the app stores, and inventing a second
-     * one would be a setting nobody asked for.
-     */
-    /**
-     * The region of the node the user already chose — the only manual
-     * preference the app stores.
-     *
-     * resolve(), not classify(): the same rule the region groups use, so a node
-     * the Nodes page files under 美国 is also the one the picker treats as
-     * American. Name-only classification would disagree for every node whose
-     * name says nothing — which is most imported ones.
-     */
-    private fun preferredRegion(
-        nodes: List<com.justnpcx.starveil.core.model.Profile>,
-        selectedId: Long?,
-    ): NodeRegion? = nodes.firstOrNull { it.id == selectedId }
-        ?.let { NodeRegions.resolve(it.name, it.country) }
 
     private suspend fun recommend(exclude: Long?): NodeRecommendation? {
         val nodes = profiles.observeAll().first()
         if (nodes.isEmpty()) return null
         val samples = nodeHealth.observeAll().first()
         val selectedId = preferences.selectedProfileId.first()
-        val preferredRegion = preferredRegion(nodes, selectedId)
+        val preferredRegion = preferredRegionOf(nodes, selectedId)
 
         return NodePicker.recommend(
             candidates = nodes

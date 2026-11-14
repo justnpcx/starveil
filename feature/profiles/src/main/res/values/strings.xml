@@ -243,4 +243,7 @@
     <string name="profiles_share_copy_json">Copy sing-box JSON</string>
     <string name="profiles_share_json_copied">JSON copied</string>
     <string name="profiles_detail_chart_desc">Latency history for %1$s.</string>
+    <string name="profiles_selection_label">Selection</string>
+    <string name="profiles_selection_auto">Fastest</string>
+    <string name="profiles_selection_manual">By hand</string>
 </resources>

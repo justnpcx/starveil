@@ -233,4 +233,7 @@
     <string name="profiles_share_copy_json">複製 sing-box JSON</string>
     <string name="profiles_share_json_copied">JSON 已複製</string>
     <string name="profiles_detail_chart_desc">「%1$s」的延遲歷史。</string>
+    <string name="profiles_selection_label">選擇方式</string>
+    <string name="profiles_selection_auto">自動選最快</string>
+    <string name="profiles_selection_manual">手動選節點</string>
 </resources>

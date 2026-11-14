@@ -31,10 +31,7 @@
 
     <!-- §7.2 node health history. -->
     <string name="dashboard_latency_label">節點延遲</string>
-    <string name="dashboard_node_health_inline">節點延遲 %1$d ms · 線上 %2$d%%</string>
     <string name="dashboard_node_health_line">延遲 %1$d ms</string>
-    <string name="dashboard_health_chart_desc">%1$d 次探測的延遲曲線：最低 %2$d ms，最高 %3$d ms。</string>
-    <string name="dashboard_health_chart_empty">延遲曲線：該時間窗內沒有成功探測。</string>
     <string name="dashboard_traffic_chart_desc">最近 %1$d 秒的流量，下行峰值 %2$s。</string>
 
     <string name="dashboard_auto_select">自動選擇</string>
@@ -52,19 +49,11 @@
     <string name="dashboard_failure_close">關閉</string>
     <string name="dashboard_failure_copy">複製</string>
     <string name="dashboard_notice_kernel_refused_reason">核心啟動失敗：%1$s</string>
-    <string name="dashboard_mode_auto">自動</string>
-    <string name="dashboard_mode_manual">手動</string>
     <string name="dashboard_hint_connect">點按連線</string>
     <string name="dashboard_hint_disconnect">點按斷開</string>
     <string name="dashboard_hint_connecting">正在建立隧道</string>
     <string name="dashboard_hint_blocked">點按重試</string>
 
-    <string name="dashboard_health_collecting">正在取樣：%1$d / %2$d 次。夠畫出形狀時才顯示曲線。</string>
-    <string name="dashboard_health_all_unreachable">該時間窗內 %1$d 次探測全部不可達，沒有可畫的延遲樣本。</string>
-    <string name="dashboard_health_details_title">節點健康</string>
-    <string name="dashboard_health_legend_availability">線上率——探測有回應的比例。</string>
-    <string name="dashboard_health_legend_ema">延遲 EMA——只對成功回來的探測做平滑。</string>
-    <string name="dashboard_health_legend_loss">丟包點——每次沒有回應的探測畫一個點，不參與延遲曲線。</string>
     <string name="dashboard_exit_details_title">出口</string>
     <string name="dashboard_exit_address">出口 IP</string>
     <string name="dashboard_exit_rtt_smoothed">出口延遲</string>
@@ -79,11 +68,12 @@
     <string name="dashboard_exit_no_record">暫無記錄</string>
     <string name="dashboard_exit_session_today">今天 %1$s 開始 · 進行中</string>
     <string name="dashboard_exit_session_date">%1$s 開始 · 進行中</string>
-    <string name="dashboard_exit_last_today">上次會話 今天 %1$s</string>
-    <string name="dashboard_exit_last_date">上次會話 %1$s</string>
     <string name="dashboard_recent_title">最近使用</string>
     <string name="dashboard_recent_health">%1$d ms · 線上 %2$d%%</string>
     <string name="dashboard_recent_untested">未測得</string>
     <string name="dashboard_exit_last_address">上次出口 IP</string>
     <string name="dashboard_exit_last_latency">上次出口延遲</string>
+    <string name="dashboard_exit_last_session">上次會話</string>
+    <string name="dashboard_exit_last_today_value">今天 %1$s</string>
+    <string name="dashboard_exit_last_date_value">%1$s</string>
 </resources>

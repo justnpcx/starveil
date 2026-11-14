@@ -73,6 +73,25 @@ object StarveilIcons {
         }
     }
 
+    /** Recent: a clock, for the rows that remember where the tunnel has been. */
+    val Clock: ImageVector by lazy {
+        strokeIcon("Line.Clock") {
+            iconPath {
+                moveTo(12f, 3f)
+                curveTo(16.97f, 3f, 21f, 7.03f, 21f, 12f)
+                curveTo(21f, 16.97f, 16.97f, 21f, 12f, 21f)
+                curveTo(7.03f, 21f, 3f, 16.97f, 3f, 12f)
+                curveTo(3f, 7.03f, 7.03f, 3f, 12f, 3f)
+                close()
+            }
+            iconPath {
+                moveTo(12f, 7f)
+                verticalLineTo(12f)
+                lineTo(15.5f, 14.2f)
+            }
+        }
+    }
+
     /** Nodes: a list of rows. */
     val Nodes: ImageVector by lazy {
         strokeIcon("Line.Nodes") {

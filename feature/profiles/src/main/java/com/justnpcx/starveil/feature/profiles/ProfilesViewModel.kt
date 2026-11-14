@@ -6,6 +6,7 @@ import com.justnpcx.starveil.core.data.preferences.ConnectionTarget
 import com.justnpcx.starveil.core.data.preferences.PreferencesRepository
 import com.justnpcx.starveil.core.data.repository.ChainInvalidationBus
 import com.justnpcx.starveil.core.data.repository.GroupRepository
+import com.justnpcx.starveil.core.data.repository.NodeAutoPicker
 import com.justnpcx.starveil.core.data.repository.NodeHealthRepository
 import com.justnpcx.starveil.core.data.geo.CountryResolver
 import com.justnpcx.starveil.core.data.repository.ProfileRepository
@@ -215,6 +216,7 @@ class ProfilesViewModel @Inject constructor(
     private val refreshScheduler: SubscriptionRefreshScheduler,
     private val nodeHealth: NodeHealthRepository,
     private val countryResolver: CountryResolver,
+    private val autoPicker: NodeAutoPicker,
     private val chainInvalidations: ChainInvalidationBus = ChainInvalidationBus(),
 ) : ViewModel() {
 
@@ -399,6 +401,40 @@ class ProfilesViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = ProfilesUiState(),
     )
+
+    /**
+     * Auto or manual, as the Nodes page's selection row shows it.
+     *
+     * Read straight from the preference rather than folded into [uiState]: the
+     * row is one control, and a sixth input to the list pipeline would re-run
+     * the whole filter on every mode change.
+     */
+    val selectionMode: StateFlow<NodeSelectionMode> = preferences.nodeSelectionMode.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = NodeSelectionMode.AUTO,
+    )
+
+    /**
+     * Switch the global selection mode from the Nodes page.
+     *
+     * Automatic picks now, through the same [NodeAutoPicker] the home page's
+     * control used: the pick is a decision, and a node that does not beat the
+     * current one by the stickiness margin is deliberately not a switch. The
+     * selected id is what reconnects a running tunnel — the same write a tap on
+     * a row makes.
+     */
+    fun setSelectionMode(mode: NodeSelectionMode) {
+        viewModelScope.launch {
+            // Deliberately not guarded on "already this mode": tapping
+            // "Fastest" while already automatic is a request to pick now, and
+            // a guard would make the row's first tap do nothing at all.
+            preferences.setNodeSelectionMode(mode)
+            if (mode != NodeSelectionMode.AUTO) return@launch
+            val pick = autoPicker.pick() ?: return@launch
+            if (pick.switch) preferences.setSelectedProfileId(pick.recommendation.profileId)
+        }
+    }
 
     /** The hint has been read (or a long-press made it moot). */
     /**
