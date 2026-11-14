@@ -41,8 +41,8 @@ object CountryFlags {
  *
  * The globe is a deliberate fallback, not an error state: a node whose address
  * is private or otherwise not in the GeoIP database still works, and a region
- * mark on every row keeps the names starting at the same place. A globe is one
- * code point, so the dashboard's leading-mark split leaves it in the name
- * string and it renders inline at the name's own size.
+ * mark on every row keeps the names starting at the same place. It is a single
+ * code point rather than a regional-indicator pair, so a caller that splits the
+ * mark off the name has to recognise it too — the dashboard's splitter does.
  */
 fun Profile.displayName(): String = "${CountryFlags.flag(country) ?: CountryFlags.UNKNOWN} $name"
