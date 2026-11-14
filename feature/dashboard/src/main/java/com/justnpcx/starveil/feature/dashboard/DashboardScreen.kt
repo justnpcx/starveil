@@ -27,6 +27,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import com.justnpcx.starveil.core.ui.icons.StarveilIcons
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -249,20 +251,13 @@ fun DashboardScreen(
             )
 
             // The recent rows are content, not navigation: they fill the space
-            // under the exit card and each one is a node the app has actually
-            // used. With no history the whole group — caption included — is
-            // absent, so a first launch never shows an empty shelf.
+            // under the connection card and each one is a node the app has
+            // actually used. With no history the whole group is absent — card
+            // and header included — so a first launch never shows an empty
+            // shelf.
             if (state.recentNodes.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(StarveilSpacing.xl))
-                Text(
-                    text = stringResource(R.string.dashboard_recent_title).uppercase(),
-                    style = StarveilType.tech,
-                    color = StarveilColors.ink2,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = StarveilSpacing.sm),
-                )
-                RecentNodesCard(
+                Spacer(modifier = Modifier.height(metrics.sectionGap))
+                RecentCard(
                     nodes = state.recentNodes,
                     onSelect = viewModel::selectRecentNode,
                 )
@@ -865,10 +860,36 @@ private fun NodeZone(name: String, health: NodeHealth?, padding: Dp) {
     }
 }
 
-/** The recent rows: one card, the node list's row grammar, no new visuals. */
+/**
+ * The recent rows, with their own header.
+ *
+ * The header lives inside the card: "Recent" was a caption floating above a
+ * card, which read as a section of the page rather than as the card's own
+ * title. The clock is the one glyph that says "used before" without a word.
+ */
 @Composable
-private fun RecentNodesCard(nodes: List<RecentNodeUi>, onSelect: (Long) -> Unit) {
+private fun RecentCard(nodes: List<RecentNodeUi>, onSelect: (Long) -> Unit) {
     StarveilCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = StarveilSpacing.lg, vertical = StarveilSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = StarveilIcons.Clock,
+                contentDescription = null,
+                tint = StarveilColors.ink2,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(modifier = Modifier.width(StarveilSpacing.sm))
+            Text(
+                text = stringResource(R.string.dashboard_recent_title).uppercase(),
+                style = StarveilType.tech,
+                color = StarveilColors.ink2,
+            )
+        }
+        StarveilDivider(startInset = StarveilSpacing.lg)
         nodes.forEachIndexed { index, node ->
             RecentNodeRow(node = node, onClick = { onSelect(node.profile.id) })
             if (index != nodes.lastIndex) {
@@ -879,9 +900,9 @@ private fun RecentNodesCard(nodes: List<RecentNodeUi>, onSelect: (Long) -> Unit)
 }
 
 /**
- * One recent node: flag and name, then the same latency/availability line the
- * node card uses. The row selects; it does not navigate, so there is no
- * chevron to promise a page that does not exist.
+ * One recent node, on one line: flag and name left, latency and availability
+ * right. The row selects; it does not navigate, so there is no chevron to
+ * promise a page that does not exist.
  */
 @Composable
 private fun RecentNodeRow(node: RecentNodeUi, onClick: () -> Unit) {
@@ -889,21 +910,18 @@ private fun RecentNodeRow(node: RecentNodeUi, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(role = Role.Button, onClick = onClick)
-            .heightIn(min = 64.dp)
+            .heightIn(min = 48.dp)
             .padding(horizontal = StarveilSpacing.lg, vertical = StarveilSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            NodeName(name = node.profile.displayName())
-            Spacer(modifier = Modifier.height(StarveilSpacing.xs))
-            Text(
-                text = healthLine(node.health),
-                style = StarveilType.label,
-                color = StarveilColors.ink2,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        NodeName(name = node.profile.displayName(), modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.width(StarveilSpacing.md))
+        Text(
+            text = healthLine(node.health),
+            style = StarveilType.tech,
+            color = StarveilColors.ink2,
+            maxLines = 1,
+        )
     }
 }
 
@@ -992,6 +1010,8 @@ private data class HomeMetrics(
     /** The status slot's height when it has something to say. */
     val contextSlot: Dp,
     val cardGap: Dp,
+    /** The gap between the connection card and the recent card. */
+    val sectionGap: Dp,
     val cardPadding: Dp,
     /** Air under the last card, before the navigation bar. */
     val bottomGap: Dp,
@@ -1020,6 +1040,7 @@ private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
         telemetry = TELEMETRY_HEIGHT,
         contextSlot = CONTEXT_SLOT_HEIGHT,
         cardGap = StarveilSpacing.xl,
+        sectionGap = StarveilSpacing.lg,
         cardPadding = StarveilSpacing.lg,
         bottomGap = 24.dp,
         collapseEmptySlot = false,
@@ -1029,6 +1050,7 @@ private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
         telemetry = 92.dp,
         contextSlot = 20.dp,
         cardGap = StarveilSpacing.sm,
+        sectionGap = StarveilSpacing.md,
         cardPadding = StarveilSpacing.lg,
         bottomGap = 12.dp,
         collapseEmptySlot = true,
@@ -1038,6 +1060,7 @@ private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
         telemetry = 80.dp,
         contextSlot = 20.dp,
         cardGap = StarveilSpacing.sm,
+        sectionGap = StarveilSpacing.sm,
         cardPadding = StarveilSpacing.md,
         bottomGap = 8.dp,
         collapseEmptySlot = true,
