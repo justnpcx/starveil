@@ -5,16 +5,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,8 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,7 +34,6 @@ import com.justnpcx.starveil.core.ui.components.StarveilBackground
 import com.justnpcx.starveil.core.ui.components.TopBarActionsState
 import com.justnpcx.starveil.core.ui.components.StarveilIconAction
 import com.justnpcx.starveil.core.ui.icons.StarveilIcons
-import com.justnpcx.starveil.core.ui.theme.StarveilBrand
 import com.justnpcx.starveil.core.ui.theme.StarveilColors
 import com.justnpcx.starveil.core.ui.theme.StarveilSpacing
 import com.justnpcx.starveil.core.ui.theme.StarveilType
@@ -112,11 +106,6 @@ fun StarveilShell(
                         onBack = { navController.popBackStack() },
                         showThemeToggle = !secondary,
                         onToggleTheme = onToggleTheme,
-                        // The home page is the only one whose content starts
-                        // with a brand-coloured object; a short gradient rule
-                        // under its title is the one place the brand can be
-                        // stated without a filled surface.
-                        brandRule = route == "dashboard",
                         actions = actions.content,
                     )
                 }
@@ -156,7 +145,6 @@ private fun StarveilTopBar(
     onBack: () -> Unit,
     showThemeToggle: Boolean,
     onToggleTheme: () -> Unit,
-    brandRule: Boolean = false,
     actions: (@Composable RowScope.() -> Unit)?,
 ) {
     Row(
@@ -188,16 +176,6 @@ private fun StarveilTopBar(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (brandRule) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .width(28.dp)
-                        .height(2.dp)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(Brush.horizontalGradient(StarveilBrand.colors)),
-                )
-            }
         }
         actions?.invoke(this)
         if (showThemeToggle) {
