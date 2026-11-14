@@ -160,6 +160,42 @@ object StarveilIcons {
         }
     }
 
+    /**
+     * Bolt: the measure-now mark on a group's header.
+     *
+     * Drawn as one closed outline rather than a filled glyph, like the rest of
+     * the set: a solid bolt at 1.5dp beside a 18dp chevron reads as a different
+     * weight of object.
+     */
+    val Bolt: ImageVector by lazy {
+        strokeIcon("Line.Bolt") {
+            iconPath {
+                moveTo(13.5f, 3f)
+                lineTo(5f, 13.5f)
+                lineTo(11f, 13.5f)
+                lineTo(10.5f, 21f)
+                lineTo(19f, 10.5f)
+                lineTo(13f, 10.5f)
+                close()
+            }
+        }
+    }
+
+    /** Filter: a funnel, for the one bar that narrows the list. */
+    val Filter: ImageVector by lazy {
+        strokeIcon("Line.Filter") {
+            iconPath {
+                moveTo(3.5f, 5f)
+                lineTo(20.5f, 5f)
+                lineTo(14f, 12.5f)
+                lineTo(14f, 20f)
+                lineTo(10f, 18f)
+                lineTo(10f, 12.5f)
+                close()
+            }
+        }
+    }
+
     /** Search: the magnifier. */
     val Search: ImageVector by lazy {
         strokeIcon("Line.Search") {

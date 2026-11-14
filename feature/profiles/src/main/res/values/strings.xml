@@ -3,7 +3,6 @@
     <string name="profiles_title">Nodes</string>
     <string name="profiles_empty_title">No nodes yet</string>
     <string name="profiles_empty_body">Import a subscription or a share link to add nodes.</string>
-    <string name="profiles_list_empty">Nothing to show here. Long-press a node to favourite or manage it.</string>
     <string name="profiles_latency_untested">Untested</string>
     <string name="profiles_latency_ms">%1$d ms</string>
     <!-- §6.3: the last probe did not come back. -->
@@ -51,7 +50,6 @@
     <string name="add_clipboard_form_title">Import from clipboard</string>
     <string name="add_clipboard_form_paste">Paste</string>
     <string name="add_clipboard_form_formats">vless, vmess, trojan, ss, hysteria2 and tuic links, one per line — or a subscription URL.</string>
-    <string name="profiles_refreshed">Refreshed · latency updated</string>
     <string name="add_panel_label_batch">Batch import</string>
     <string name="add_subscription_done">Imported %1$s · %2$d new nodes</string>
     <string name="add_view">View</string>
@@ -82,7 +80,6 @@
     <string name="profiles_dialog_scene_name">Scene name</string>
     <string name="profiles_dialog_create">Create</string>
 
-    <string name="profiles_test_selected">Test the selected node</string>
     <string name="profiles_new_node_title">Which protocol?</string>
     <string name="profiles_row_edit">Edit</string>
     <string name="profiles_row_share">Share</string>
@@ -119,12 +116,10 @@
     <string name="profiles_chain_exit">Exit node: %1$s</string>
     <string name="profiles_chain_direct">Direct: this node connects on its own</string>
     <string name="profiles_chain_path">%1$s → %2$s</string>
-    <string name="profiles_row_via">via</string>
     <string name="profiles_chain_none">No front node</string>
     <string name="profiles_chain_clear">Clear the front node</string>
     <string name="profiles_chain_no_candidates">No node can be a front here: a node already behind one cannot front another.</string>
     <string name="profiles_row_move">Move to group</string>
-    <string name="profiles_group_all">All</string>
     <string name="profiles_search_hint">Search name or address</string>
     <string name="profiles_search_clear">Clear search</string>
     <string name="profiles_no_search_title">Nothing matches</string>
@@ -233,7 +228,6 @@
     <string name="profiles_probe_note_reality">n/a · REALITY needs the kernel\'s uTLS handshake</string>
     <string name="profiles_probe_note_no_tls">n/a · no TLS layer</string>
     <string name="profiles_probe_note_no_http">n/a · the proxy protocol is not HTTP</string>
-    <string name="profiles_selected_unreachable">selected, unreachable</string>
 <string name="profiles_favorites">Favorites</string>
     <string name="profiles_favorite_add">Pin to top</string>
     <string name="profiles_favorite_remove">Unpin</string>
@@ -243,7 +237,23 @@
     <string name="profiles_share_copy_json">Copy sing-box JSON</string>
     <string name="profiles_share_json_copied">JSON copied</string>
     <string name="profiles_detail_chart_desc">Latency history for %1$s.</string>
-    <string name="profiles_selection_label">Selection</string>
-    <string name="profiles_selection_auto">Fastest</string>
-    <string name="profiles_selection_manual">By hand</string>
+    <string name="profiles_test_all">Test all nodes</string>
+    <string name="profiles_add_or_import">Add or import</string>
+    <string name="profiles_node_current">Current node</string>
+    <string name="profiles_auto_title">Auto — fastest</string>
+    <string name="profiles_auto_manual">Tap to go back to auto</string>
+    <string name="profiles_auto_current_none">No node picked yet</string>
+    <string name="profiles_auto_current">Now: %1$s · %2$d ms</string>
+    <string name="profiles_auto_current_plain">Now: %1$s</string>
+    <string name="profiles_auto_on">Automatic selection on</string>
+    <string name="profiles_filter_open">Filter nodes</string>
+    <string name="profiles_filter_active">Filter on</string>
+    <string name="profiles_filter_title">Filter</string>
+    <string name="profiles_filter_clear">Clear filter</string>
+    <string name="profiles_filter_favorites">Favourites only</string>
+    <string name="profiles_filter_country">Country</string>
+    <string name="profiles_filter_groups">Subscriptions and groups</string>
+    <string name="profiles_group_test">Test this group</string>
+    <string name="profiles_group_expand">Expand group</string>
+    <string name="profiles_group_collapse">Collapse group</string>
 </resources>

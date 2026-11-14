@@ -119,6 +119,14 @@ fun StarveilSearchField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
+    /**
+     * A control at the far end of the same field.
+     *
+     * Part of the field rather than a second button beside it: the search box
+     * and what narrows the list are one bar, and two rounded rectangles side by
+     * side would read as two unrelated controls.
+     */
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     Row(
@@ -180,6 +188,7 @@ fun StarveilSearchField(
                 )
             }
         }
+        trailing?.invoke()
     }
 }
 

@@ -8,6 +8,25 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.32] — 2026-11-14
+
+### Changed
+
+- **The Nodes page is the list.** The mode switch, the search box, the filter
+  chip strip and the floating plus are gone. A pinned row states automatic
+  selection, names what it picked and how fast it is, and is itself the way
+  back to automatic. Search and filtering are one bar that scrolls with the
+  list; the funnel opens a sheet with favourites, the countries the list holds
+  and its groups. Each group is a card with its mode, its count, a button that
+  measures just that group and a fold; the bar's refresh measures everything.
+- **Node rows are quieter**: regular-weight names, a second line that is only
+  the address, and the current node marked by a check at the end of the row.
+- **Region marks are inline again.** The flag is part of the name at the name's
+  size — no circle, nothing taller than the line to crop — and a node whose
+  country cannot be resolved shows the United Nations flag instead of nothing.
+- **The About page uses the hub's icon beds**: a toned rounded square with the
+  glyph in that tone's ink, rather than a bare outline.
+
 ## [0.9.31] — 2026-11-14
 
 ### Changed

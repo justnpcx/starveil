@@ -6,9 +6,11 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +50,7 @@ import com.justnpcx.starveil.core.ui.R as UiR
 import com.justnpcx.starveil.core.ui.components.StarveilCard
 import com.justnpcx.starveil.core.ui.components.StarveilDivider
 import com.justnpcx.starveil.core.ui.icons.StarveilIcons
+import com.justnpcx.starveil.core.ui.theme.HubTone
 import com.justnpcx.starveil.core.ui.theme.StarveilColors
 import com.justnpcx.starveil.core.ui.theme.StarveilShapes
 import com.justnpcx.starveil.core.ui.theme.StarveilSpacing
@@ -135,6 +138,9 @@ fun AboutScreen(
         StarveilCard {
             AboutRow(
                 icon = StarveilIcons.Refresh,
+                // Blue, like the hub's log rows: this row is about the build
+                // being current, and blue is the app's "information" tone.
+                tone = StarveilColors.hubLogs,
                 title = stringResource(R.string.about_update_title),
                 value = updateText(update),
                 // Busy states are not targets: a second tap while a check or a
@@ -166,19 +172,22 @@ fun AboutScreen(
             )
             StarveilDivider(startInset = StarveilSpacing.lg)
             AboutRow(
-                icon = StarveilIcons.StarOutline,
+                icon = StarveilIcons.Star,
+                tone = StarveilColors.hubScenes,
                 title = stringResource(R.string.about_features_title),
                 onClick = { showFeatures = true },
             )
             StarveilDivider(startInset = StarveilSpacing.lg)
             AboutRow(
-                icon = StarveilIcons.Nodes,
+                icon = StarveilIcons.List,
+                tone = StarveilColors.hubDiagnostics,
                 title = stringResource(R.string.about_privacy_title),
                 onClick = onOpenPrivacy,
             )
             StarveilDivider(startInset = StarveilSpacing.lg)
             AboutRow(
                 icon = StarveilIcons.List,
+                tone = StarveilColors.hubSettings,
                 title = stringResource(R.string.about_licences_title),
                 onClick = { showLicences = true },
             )
@@ -190,6 +199,10 @@ fun AboutScreen(
             // tap goes.
             AboutRow(
                 icon = StarveilIcons.GitHub,
+                // A neutral bed and the mark's own ink: the GitHub logo is a
+                // brand, not one of the app's destinations, so it is the one
+                // row whose glyph is not tinted by a hub tone.
+                tone = HubTone(bg = StarveilColors.segBg, ink = StarveilColors.ink),
                 title = stringResource(R.string.about_github_title),
                 onClick = { openProjectRepo(context) },
             )
@@ -271,7 +284,15 @@ private fun openProjectRepo(context: Context) {
     }
 }
 
-/** One line of the card: glyph, title, optional value, chevron. */
+/**
+ * One line of the card: a toned glyph bed, title, optional value, chevron.
+ *
+ * The bed is the hub's: a 38dp rounded square in the destination's colour, with
+ * the glyph in that tone's ink. The page used to draw bare 20dp outlines in
+ * secondary ink, which is the hub's language with the colour taken out — two
+ * icon languages in one app. A row that is not a destination (the repository)
+ * passes a neutral tone of its own instead of a hub colour.
+ */
 @Composable
 private fun AboutRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -279,6 +300,8 @@ private fun AboutRow(
     value: String = "",
     /** How the value reads: the default for prose, `tech` for a repository path. */
     valueStyle: androidx.compose.ui.text.TextStyle = StarveilType.label,
+    /** The destination's tone: bed and glyph ink in one value. */
+    tone: HubTone,
     enabled: Boolean = true,
     /** True while a check or a download is in flight: a small spinner. */
     busy: Boolean = false,
@@ -292,12 +315,20 @@ private fun AboutRow(
             .padding(horizontal = StarveilSpacing.lg, vertical = StarveilSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        androidx.compose.material3.Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = StarveilColors.ink2,
-            modifier = Modifier.size(20.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(tone.bg),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tone.ink,
+                modifier = Modifier.size(20.dp),
+            )
+        }
         Spacer(modifier = Modifier.width(StarveilSpacing.md))
         Text(
             text = title,

@@ -23,9 +23,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -61,7 +59,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.justnpcx.starveil.core.data.preferences.ExitSnapshot
 import com.justnpcx.starveil.core.kernel.TrafficStats
-import com.justnpcx.starveil.core.model.CountryFlags
 import com.justnpcx.starveil.core.model.NodeHealth
 import com.justnpcx.starveil.core.model.displayName
 import com.justnpcx.starveil.core.model.RecommendationReason
@@ -1028,107 +1025,31 @@ private fun healthLine(health: NodeHealth?): String {
 }
 
 /**
- * A node's name, with its region mark as a quiet prefix.
+ * A node's name, with its region mark in front of it.
  *
- * The name is running text at [StarveilType.body], not a heading. It was 17sp
- * semibold with the flag at 22sp — the identifier and its decoration were the
- * loudest things in the card, while the facts a reader actually came for (the
- * exit address, the latency) are 11sp. The scale was upside down. The mark is
- * now a 14dp circular badge the size of the name's line: a prefix, not a
- * picture. A flag at 17sp read as punctuation; a 14dp circle reads as a mark.
+ * One [Text], not a mark beside a name. The flag is part of the string
+ * `Profile.displayName()` builds, and keeping it in the same run is what makes
+ * it sit on the name's baseline at the name's size — the two cannot drift, and
+ * nothing can crop the glyph, because it is no taller than the line it is in.
  *
- * `Profile.displayName()` puts the mark in the string, and splitting it out is
- * a display rule, not a data one: nothing outside this function knows the mark
- * was ever separate.
+ * The scale was upside down before: a 17sp semibold name with a 22sp flag, in a
+ * card whose facts are 11sp. The flag was also taller than the line box and
+ * lost its top and bottom to the row. At body size it is a quiet prefix, which
+ * is the intent.
  */
 @Composable
 private fun NodeName(name: String, modifier: Modifier = Modifier) {
-    val (mark, rest) = splitRegionMark(name)
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (mark != null) {
-            RegionMark(mark)
-            Spacer(modifier = Modifier.width(StarveilSpacing.sm))
-        }
-        Text(
-            text = rest,
-            style = StarveilType.body,
-            color = StarveilColors.ink,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            // The name is the only part of a row allowed to give up width:
-            // the numbers beside it must keep theirs.
-            modifier = Modifier.weight(1f, fill = false),
-        )
-    }
+    Text(
+        text = name,
+        style = StarveilType.body,
+        color = StarveilColors.ink,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        // The name is the only part of a row allowed to give up width: the
+        // numbers beside it must keep theirs.
+        modifier = modifier,
+    )
 }
-
-/** The badge's diameter: the name's line box, so the mark sits inside the line. */
-private val REGION_MARK_SIZE = 14.dp
-
-/**
- * A node's region, as a circular badge the size of the name's line.
- *
- * A flag emoji is wider than it is tall. Scaling it to the badge's height and
- * cropping the overhang to a circle keeps its proportions — no stretching, and
- * the stripes and star field are still recognisable — while making every mark
- * the same size as every other. Both are set at the same type size in the same
- * 14dp square; the flag is cropped to the circle and the globe, already round,
- * is not.
- */
-@Composable
-private fun RegionMark(mark: String) {
-    val globe = mark == CountryFlags.UNKNOWN
-    Box(
-        modifier = Modifier
-            .size(REGION_MARK_SIZE)
-            // A globe is already round, so cropping it would only take ink
-            // away; a flag is a rectangle and gets the circle.
-            .then(if (globe) Modifier else Modifier.clip(CircleShape)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = mark,
-            // A flag's artwork does not fill its em square, so the glyph is
-            // set larger than the badge to make its ink reach the badge's
-            // height; the box crops the overhang to the circle. The globe is
-            // set the same way, which is what makes the two look the same
-            // size rather than merely being in the same box.
-            fontSize = 16.sp,
-            lineHeight = 14.sp,
-            color = StarveilColors.ink,
-            maxLines = 1,
-            softWrap = false,
-            // Measured unbounded so the glyph keeps its natural width and
-            // overflows the square evenly instead of being squeezed.
-            modifier = Modifier.wrapContentWidth(unbounded = true),
-        )
-    }
-}
-
-/**
- * Splits a leading region mark off a name.
- *
- * The mark is a pair of regional-indicator symbols (a flag), or the single
- * globe the unknown-country fallback uses. Returns (mark, rest), or
- * (null, name) when the name does not start with one.
- */
-internal fun splitRegionMark(name: String): Pair<String?, String> {
-    val points = name.codePoints().toArray()
-    if (points.size < 3) return null to name
-    val isIndicator = { cp: Int -> cp in 0x1F1E6..0x1F1FF }
-    val length = when {
-        isIndicator(points[0]) && isIndicator(points[1]) -> 2
-        points[0] == GLOBE -> 1
-        else -> 0
-    }
-    if (length == 0) return null to name
-    val mark = String(points, 0, length)
-    val rest = String(points, length, points.size - length).trim()
-    return mark to rest
-}
-
-/** U+1F310, the globe the display name falls back to. */
-private const val GLOBE = 0x1F310
 
 /** One line of state explanation, occupied or not. */
 /**

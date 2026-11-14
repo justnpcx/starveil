@@ -109,13 +109,10 @@ fun StarveilNavHost(
     // Both come from the Activity: they need the kernel, they live in
     // :core:probe, and the screens below only receive callbacks.
     val scope = rememberCoroutineScope()
-    // The nodes page's refresh says "refreshed" only when a number came back,
-    // so it gets the outcome rather than the sentence.
-    val onRefreshLatency: ((String, Boolean) -> Unit) -> Unit = { onResult ->
-        scope.launch {
-            val result = latencyTester.testSelectedNode()
-            onResult(result.message, result.measured)
-        }
+    // A sweep — the bar's refresh passes every node, a group's bolt passes that
+    // group's — and one line that says how many answered.
+    val onTestNodes: (List<Long>, (String) -> Unit) -> Unit = { ids, onResult ->
+        scope.launch { onResult(latencyTester.testNodes(ids)) }
     }
     // The same probe for one node: tapping a card's badge should measure that
     // card, not whichever node happens to be selected.
@@ -201,7 +198,7 @@ fun StarveilNavHost(
         navigation(startDestination = Destination.PROFILES.route, route = "nodes") {
         composable(Destination.PROFILES.route) {
             ProfilesScreen(
-                onRefreshLatency = onRefreshLatency,
+                onTestNodes = onTestNodes,
                 onTestNode = onTestNode,
                 onNewNode = { type -> navController.navigate(editorRouteFor(type)) },
                 onEditNode = { type, id -> navController.navigate("${editorRouteFor(type)}?id=$id") },

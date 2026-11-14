@@ -56,6 +56,8 @@ sealed interface NodeFilter {
     data object Favorites : NodeFilter
     /** One group — a folder, a subscription, or a derived region. */
     data class Group(val id: Long) : NodeFilter
+    /** One country, by ISO-3166 alpha-2 — the code the flag is drawn from. */
+    data class Country(val iso: String) : NodeFilter
 }
 
 data class ProfilesUiState(
@@ -337,6 +339,8 @@ class ProfilesViewModel @Inject constructor(
                     list.filter { it.groupId == filter.id }
                 }
             }
+            is NodeFilter.Country ->
+                list.filter { it.country?.uppercase() == filter.iso }
         }
         // Favorites come first — "pin", not just "bookmark". The sort is
         // stable, so the order inside each half is the one the list already
@@ -535,6 +539,16 @@ class ProfilesViewModel @Inject constructor(
     }
 
     /** [groupId] of null shows everything; otherwise exactly that group. */
+    /** The filter sheet's country section; null means every country. */
+    fun filterByCountry(iso: String?) {
+        nodeFilter.value = iso?.let { NodeFilter.Country(it.uppercase()) } ?: NodeFilter.All
+    }
+
+    /** The sheet's clear: the list goes back to everything. The query stays. */
+    fun clearFilter() {
+        nodeFilter.value = NodeFilter.All
+    }
+
     fun filterByGroup(groupId: Long?) {
         nodeFilter.value = groupId?.let { NodeFilter.Group(it) } ?: NodeFilter.All
     }

@@ -22,7 +22,7 @@ class CountryFlagsTest {
     }
 
     @Test
-    fun `the display name carries the flag only when the country is known`() {
+    fun `the display name carries a flag, and the UN flag when the country is unknown`() {
         val known = Profile(
             name = "HY2+Reality",
             type = ProfileType.VLESS,
@@ -32,9 +32,17 @@ class CountryFlagsTest {
         )
         assertEquals("🇺🇸 HY2+Reality", known.displayName())
 
-        // A node the GeoIP database cannot place gets the globe, not a bare
-        // name: every row starts with a region mark of the same size.
-        assertEquals("🌐 HY2+Reality", known.copy(country = null).displayName())
-        assertEquals("🌐 HY2+Reality", known.copy(country = "not a code").displayName())
+        // A node the GeoIP database cannot place gets the United Nations
+        // flag, not a bare name: every row starts with a region mark of the
+        // same shape and size as the real ones.
+        assertEquals("🇺🇳 HY2+Reality", known.copy(country = null).displayName())
+        assertEquals("🇺🇳 HY2+Reality", known.copy(country = "not a code").displayName())
+    }
+
+    @Test
+    fun `the unknown mark is the flag of UN`() {
+        // The fallback is a real regional-indicator flag, not a special glyph:
+        // this is what keeps it the same shape and size as every country flag.
+        assertEquals(CountryFlags.flag("UN"), CountryFlags.UNKNOWN)
     }
 }

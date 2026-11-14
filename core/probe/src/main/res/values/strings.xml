@@ -9,4 +9,6 @@
     <string name="latency_unreachable">Could not reach the node — no TCP reply on its port.</string>
     <string name="latency_resolution_failed">Could not resolve the node\'s domain name.</string>
     <string name="latency_not_applicable">Not measurable — WireGuard speaks UDP only, and this probe is a TCP handshake.</string>
+    <!-- A sweep: how many were asked, and how many answered. -->
+    <string name="latency_batch">Tested %1$d · %2$d reachable</string>
 </resources>
