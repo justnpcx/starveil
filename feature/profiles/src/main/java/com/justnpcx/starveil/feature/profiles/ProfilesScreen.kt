@@ -14,6 +14,7 @@ import com.justnpcx.starveil.core.ui.theme.StarveilBrand
 import com.justnpcx.starveil.core.ui.theme.StarveilMotion
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.semantics.Role
@@ -24,12 +25,12 @@ import androidx.compose.ui.semantics.stateDescription
 import com.justnpcx.starveil.core.ui.components.ChainProxySheet
 import com.justnpcx.starveil.core.ui.components.LocalTopBarActions
 import com.justnpcx.starveil.core.ui.components.StarveilSnackbarHost
-import com.justnpcx.starveil.core.ui.components.StarveilPlusDisc
 import com.justnpcx.starveil.core.ui.components.StarveilAddSheet
 import com.justnpcx.starveil.core.ui.components.StarveilTextField
 import com.justnpcx.starveil.core.subscription.DocumentFormat
 import com.justnpcx.starveil.core.subscription.ImportFailure
 import com.justnpcx.starveil.core.subscription.SubscriptionFailure
+import com.justnpcx.starveil.core.model.CountryFlags
 import com.justnpcx.starveil.core.model.NodeHealth
 import com.justnpcx.starveil.core.model.NodeRegions
 import com.justnpcx.starveil.core.model.NodeSelectionMode
@@ -41,22 +42,24 @@ import com.justnpcx.starveil.core.ui.components.StarveilSkeletonRow
 import com.justnpcx.starveil.core.ui.components.ChipSurface
 import com.justnpcx.starveil.core.ui.components.StarveilChip
 import com.justnpcx.starveil.core.ui.components.StarveilChipRow
-import com.justnpcx.starveil.core.ui.components.StarveilSegmented
 import com.justnpcx.starveil.core.ui.components.StarveilDivider
 import com.justnpcx.starveil.core.ui.components.StarveilIconAction
 import com.justnpcx.starveil.core.ui.components.StarveilSearchField
-import com.justnpcx.starveil.core.ui.components.StarveilStar
+import com.justnpcx.starveil.core.ui.components.StarveilSwitch
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -87,6 +90,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -110,10 +114,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -128,8 +129,10 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -166,9 +169,6 @@ import com.justnpcx.starveil.core.ui.util.writeClipboard
 /** How long a transient message stays on screen. */
 private const val MESSAGE_VISIBLE_MS = 2_500L
 
-/** The add control's own height, plus a gap. */
-private val FAB_CLEARANCE = 72.dp
-
 /**
  * Nodes — the real list plus the import entry points. A node arrives by
  * scanning a QR code, pasting from the clipboard, or typing a share link /
@@ -191,10 +191,13 @@ fun ProfilesScreen(
     /** Measures one node by id, and reports what happened. */
     onTestNode: (Long, (String) -> Unit) -> Unit = { _, _ -> },
     /**
-     * The bar's refresh: measures the selected node and reports whether a
-     * number came back, so the page can say "refreshed" only when it did.
+     * Measures a batch of nodes and reports what happened.
+     *
+     * The bar's refresh passes every node; a group's bolt passes that group's.
+     * One callback rather than two, because the sweep is the same sweep — only
+     * the list handed to it differs.
      */
-    onRefreshLatency: ((message: String, measured: Boolean) -> Unit) -> Unit = { _ -> },
+    onTestNodes: (ids: List<Long>, onResult: (String) -> Unit) -> Unit = { _, _ -> },
     /**
      * A link that arrived from outside the app, to import on arrival.
      *
@@ -221,15 +224,6 @@ fun ProfilesScreen(
     val subscriptionImport by viewModel.lastSubscriptionImport.collectAsStateWithLifecycle()
     val highlightedNode by viewModel.highlightedNode.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    // Point at the row the import produced: scroll to it, flash it once, then
-    // let the highlight go. Nothing is left behind afterwards.
-    LaunchedEffect(highlightedNode) {
-        val id = highlightedNode ?: return@LaunchedEffect
-        val index = state.profiles.indexOfFirst { it.id == id }
-        if (index >= 0) listState.animateScrollToItem(index)
-        delay(HIGHLIGHT_MS)
-        viewModel.clearHighlight()
-    }
     val context = LocalContext.current
     // The second of the two moments the clipboard is read: the page coming back
     // to the foreground. Nothing polls, and Android's own "pasted from" notice
@@ -313,18 +307,90 @@ fun ProfilesScreen(
     // from the unfiltered node pool so selecting a chip does not make other chips vanish.
     // Every folder, empty or not: a group the user just made has to be
     // visible, or creating one looks like it did nothing. Region groups are
-    // derived, so an empty one is noise rather than a container.
-    val chipGroups = remember(state.groups) {
-        state.groups.filter { it.region == null || it.profileIds.isNotEmpty() }
-    }
     // Two nodes can share a display name, and two more can share the first
     // dozen characters of one — which is what the list actually shows, because
     // the title is one line with an ellipsis. Both cases need a suffix, so the
     // test is on the truncated prefix, over the rows that are on screen.
     val disambiguators = remember(state.profiles) { disambiguate(state.profiles) }
-    // Key to name, so a row can say what it dials through without walking the
-    // whole list for every row.
-    val frontNames = remember(state.profiles) { state.profiles.associate { it.nodeKey to it.name } }
+
+    // The filter sheet, and the groups the user has folded. Both are view state:
+    // which filter is in force lives in the view model, but whether a card is
+    // open is not something to persist across visits.
+    var filterSheet by remember { mutableStateOf(false) }
+    val collapsedGroups = remember { mutableStateMapOf<Long, Boolean>() }
+
+    // What the pinned row says about the current target. A group target has no
+    // single node, so it names the group; a node target adds its last reading,
+    // which is the number the row exists to make visible without opening
+    // anything.
+    val selectedProfile = remember(state.allProfiles, state.selectedId) {
+        state.allProfiles.firstOrNull { it.id == state.selectedId }
+    }
+    val selectedGroupName = remember(state.groups, state.selectedGroupId) {
+        state.groups.firstOrNull { it.id == state.selectedGroupId }?.name
+    }
+    val currentLabel = selectedGroupName ?: selectedProfile?.name
+    val currentMs = selectedProfile
+        ?.let { latencyReading(it, state.health[it.id]) as? LatencyReading.Value }
+        ?.ms
+
+    // Timed-out nodes are hidden by default: a subscription with hundreds of
+    // dead rows is a list you scroll once and never again. The rows are not
+    // deleted — a footer says how many are out of the way and brings them back.
+    val timedOut = remember(state.profiles, state.health) {
+        state.profiles.filter { state.health[it.id]?.status == NodeStatus.DOWN }
+    }
+    val shownProfiles = remember(state.profiles, state.health, showTimedOut) {
+        if (showTimedOut) state.profiles else
+            state.profiles.filterNot { state.health[it.id]?.status == NodeStatus.DOWN }
+    }
+
+    // The list, grouped: one card per folder or subscription, in the order the
+    // groups are stored, plus a card for nodes that belong to none.
+    //
+    // Region groups are filters, not containers — their members are other
+    // groups' nodes, so a card for one would either be empty or show every node
+    // twice. They stay reachable in the filter sheet, which is where a derived
+    // grouping belongs.
+    val searching = state.query.isNotBlank()
+    val narrowing = state.filter !is NodeFilter.All
+    val sections = remember(state.groups, shownProfiles, searching, narrowing, state.filter) {
+        val byGroup = shownProfiles.groupBy { it.groupId }
+        val known = state.groups.mapTo(mutableSetOf()) { it.id }
+        val owned = state.groups.mapNotNull { group ->
+            if (group.region != null) return@mapNotNull null
+            val nodes = byGroup[group.id].orEmpty()
+            // An empty folder is a place, not noise: a group the user just made
+            // has to be visible, or creating one looks like it did nothing. It
+            // is only shown while browsing, though — under a filter, an empty
+            // card is one more thing to scroll past.
+            val keep = nodes.isNotEmpty() ||
+                (!searching && (!narrowing || state.filter == NodeFilter.Group(group.id)))
+            if (keep) NodeSection(group, nodes) else null
+        }
+        val loose = shownProfiles.filter { it.groupId !in known }
+        if (loose.isEmpty()) owned else owned + NodeSection(null, loose)
+    }
+
+    // The countries the list actually holds, so the sheet never offers a choice
+    // that would empty it.
+    val countries = remember(state.allProfiles) {
+        state.allProfiles.mapNotNull { it.country?.uppercase() }.distinct().sorted()
+    }
+
+    // Point at the card the import produced: scroll to it, flash it once, then
+    // let the highlight go. The list is grouped now, so the index is the card's
+    // and a folded group has to open before its row can be seen.
+    LaunchedEffect(highlightedNode) {
+        val id = highlightedNode ?: return@LaunchedEffect
+        val index = sections.indexOfFirst { section -> section.nodes.any { it.id == id } }
+        if (index >= 0) {
+            collapsedGroups.remove(sections[index].group?.id ?: 0L)
+            listState.animateScrollToItem(index + 1)
+        }
+        delay(HIGHLIGHT_MS)
+        viewModel.clearHighlight()
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     // A Snackbar instead of a banner above the list: the banner pushed the
@@ -361,22 +427,22 @@ fun ProfilesScreen(
         animationSpec = tween(REFRESH_SPIN_MS),
         label = "refresh-spin",
     )
-    val refreshedText = stringResource(R.string.profiles_refreshed)
+    // The bar's content is installed once per top bar, so the ids it sweeps have
+    // to be read through a holder rather than captured at that moment.
+    val allIds by rememberUpdatedState(state.allProfiles.map { it.id })
     val topBar = LocalTopBarActions.current
     DisposableEffect(topBar) {
         topBar?.content = {
             StarveilIconAction(
                 icon = StarveilIcons.Refresh,
-                contentDescription = stringResource(R.string.profiles_test_selected),
+                contentDescription = stringResource(R.string.profiles_test_all),
                 modifier = Modifier.graphicsLayer { rotationZ = spinAngle },
                 onClick = {
-                    // One turn of the glyph while the probe runs, then a line
+                    // One turn of the glyph while the sweep runs, then a line
                     // that says what happened. The turn is the only progress
                     // the bar can show without a second widget.
                     spin += 1
-                    onRefreshLatency { message, measured ->
-                        viewModel.postMessage(if (measured) refreshedText else message)
-                    }
+                    onTestNodes(allIds) { message -> viewModel.postMessage(message) }
                 },
             )
             Box {
@@ -389,6 +455,18 @@ fun ProfilesScreen(
                     expanded = showGroupMenu,
                     onDismissRequest = { showGroupMenu = false },
                 ) {
+                    // The plus disc is gone; its one door moves here. The panel
+                    // it opens is unchanged — scan, clipboard, manual, share
+                    // link and subscription are still the five ways in.
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.profiles_add_or_import)) },
+                        onClick = {
+                            showGroupMenu = false
+                            clipboardText = readClipboardText(context)
+                            addPanelStartsWithSubscription = false
+                            addPanel = true
+                        },
+                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.profiles_group_new)) },
                         onClick = {
@@ -438,59 +516,24 @@ fun ProfilesScreen(
                     )
                 }
             }
-            // The global choice — auto or by hand — above everything else on
-            // the page. It is deliberately not the group mode: that one lives
-            // in a group's long-press menu and only affects that group, while
-            // this one decides how the app picks a node at all. Different
-            // words, different place, so the two cannot be read as one.
+            // The pinned row: what "automatic" means, and the way back to it.
+            // It replaces the Fastest / By hand segmented control, which taught
+            // the wrong thing — that picking a node is a mode you set first.
+            // Here the default is stated once, and the row itself is the way
+            // back, so a manual pick can never become a one-way door.
             if (state.hasProfiles) {
-                SelectionModeRow(
+                AutoRow(
                     mode = selectionMode,
-                    onChange = viewModel::setSelectionMode,
+                    currentLabel = currentLabel,
+                    currentMs = currentMs,
+                    onClick = { viewModel.setSelectionMode(NodeSelectionMode.AUTO) },
                 )
+                StarveilDivider(startInset = 0.dp)
             }
-            // Above the group chips, and only once there is something to
-            // search: an empty list already says "import something", and a
-            // search field over it would be a control that cannot do anything.
-            if (state.hasProfiles) {
-                SearchField(
-                    query = state.query,
-                    onQueryChange = viewModel::setQuery,
-                    onClear = viewModel::clearQuery,
-                )
-            }
-            // Always shown, even with no groups: creating the first one has to
-            // have somewhere to live.
-            StarveilChipRow {
-                GroupChip(
-                    label = stringResource(R.string.profiles_favorites),
-                    selected = state.filter is NodeFilter.Favorites,
-                    onClick = { viewModel.filterFavorites(true) },
-                )
-                GroupChip(
-                    label = stringResource(R.string.profiles_group_all),
-                    selected = state.filter is NodeFilter.All,
-                    onClick = { viewModel.filterByGroup(null) },
-                )
-                chipGroups.forEach { group ->
-                    GroupChip(
-                        label = if (group.profileIds.isEmpty()) {
-                            stringResource(R.string.profiles_group_empty_label, group.name)
-                        } else {
-                            group.name
-                        },
-                        selected = state.filter == NodeFilter.Group(group.id),
-                        onClick = { viewModel.filterByGroup(group.id) },
-                        onLongClick = { groupMenu = group },
-                        inUse = state.selectedGroupId == group.id,
-                    )
-                }
-            }
-            // The clipboard bar sits between the chips and the list: close to
-            // the content it would add, and nowhere near the FAB.
-            // Not while the add panel is up: the panel's own clipboard card is
-            // the same import, and two doors to it on one screen is the thing
-            // the panel was rewritten to stop doing.
+            // The clipboard bar sits above the list: close to the content it
+            // would add. Not while the add panel is up — the panel's own
+            // clipboard card is the same import, and two doors to it on one
+            // screen is what the panel was rewritten to stop doing.
             if (!addPanel) {
                 clipboardSuggestion?.let { suggestion ->
                     ClipboardBar(
@@ -533,12 +576,13 @@ fun ProfilesScreen(
             if (usage != null) {
                 UsageBanner(info = usage)
             }
-            when {
+
+            if (!state.hasProfiles) {
                 // A list with nothing in it says what it is and offers the two
                 // ways in, in the middle of the page. "No nodes yet" above an
                 // empty white card and a button in the corner is a page that
                 // looks broken rather than new.
-                !state.hasProfiles -> NodesEmptyState(
+                NodesEmptyState(
                     onAdd = {
                         clipboardText = readClipboardText(context)
                         addPanelStartsWithSubscription = false
@@ -550,154 +594,138 @@ fun ProfilesScreen(
                         addPanel = true
                     },
                 )
-
-                // Nodes exist but the filter hides them: say so, rather than
-                // reusing "No nodes yet", which would be a lie.
-                state.hasNoMatches -> {
-                    // An empty group is a place, not a dead end: it gets its
-                    // own header and a line that says how to manage it, rather
-                    // than the generic "nothing matches this filter".
-                    val filtered = filterGroupId?.let { id -> state.groups.firstOrNull { it.id == id } }
-                    if (filtered != null) {
-                        StarveilCard(
-                            modifier = Modifier.padding(horizontal = StarveilSpacing.pageMargin),
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .combinedClickable(
-                                        onClick = {},
-                                        onLongClick = { groupMenu = filtered },
-                                    )
-                                    .padding(StarveilSpacing.lg),
-                            ) {
-                                Text(
-                                    text = filtered.name,
-                                    style = StarveilType.headline,
-                                    color = StarveilColors.ink,
+            } else {
+                // The page is the list. The search bar scrolls with it — it is
+                // the first row, not a second header — and the list itself is
+                // one card per group rather than one card holding everything:
+                // a folder is a unit, and its header is where its mode, its
+                // count and its own test live.
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(
+                        start = StarveilSpacing.pageMargin,
+                        end = StarveilSpacing.pageMargin,
+                        top = StarveilSpacing.sm,
+                        bottom = StarveilSpacing.lg,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(StarveilSpacing.md),
+                ) {
+                    item(key = "search") {
+                        SearchFilterBar(
+                            query = state.query,
+                            onQueryChange = viewModel::setQuery,
+                            onClear = viewModel::clearQuery,
+                            filterActive = state.filter !is NodeFilter.All,
+                            onOpenFilter = { filterSheet = true },
+                        )
+                    }
+                    if (sections.isEmpty()) {
+                        item(key = "empty") {
+                            // Two ways to end up with nothing, and they need
+                            // different sentences: a search that matched
+                            // nothing, and a filter that did.
+                            if (searching) {
+                                EmptyState(
+                                    title = stringResource(R.string.profiles_no_search_title),
+                                    body = stringResource(R.string.profiles_no_search_body, state.query),
                                 )
-                                Text(
-                                    text = stringResource(R.string.profiles_group_empty_body),
-                                    style = StarveilType.label,
-                                    color = StarveilColors.ink2,
-                                    modifier = Modifier.padding(top = StarveilSpacing.xs),
+                            } else {
+                                EmptyState(
+                                    title = stringResource(R.string.profiles_no_matches_title),
+                                    body = stringResource(R.string.profiles_no_matches_body),
                                 )
                             }
                         }
-                    } else {
-                        EmptyState(
-                            title = stringResource(R.string.profiles_no_matches_title),
-                            body = stringResource(R.string.profiles_no_matches_body),
-                        )
                     }
-                }
-
-                // Same, for the search: the sentence has to name what was
-                // searched for, or it reads like the group is empty.
-                state.hasNoSearchMatches -> EmptyState(
-                    title = stringResource(R.string.profiles_no_search_title),
-                    body = stringResource(R.string.profiles_no_search_body, state.query),
-                )
-
-                // One card holds the whole list: a column of separate cards
-                // reads as a stack of unrelated things, and the rows are one
-                // list. The FAB clears the last row by its own height.
-                else -> {
+                    sections.forEach { section ->
+                        val key = section.group?.id ?: 0L
+                        item(key = "group-$key") {
+                            GroupCard(
+                                title = section.group?.name
+                                    ?: stringResource(R.string.profiles_group_none),
+                                // The group's mode is a fact about the group, not
+                                // a control: changing it stays in the long-press
+                                // menu, where it has always been, and the two
+                                // cannot be mistaken for each other.
+                                modeLabel = section.group?.let { stringResource(it.mode.labelRes()) },
+                                count = section.nodes.size,
+                                collapsed = collapsedGroups[key] == true,
+                                onToggle = {
+                                    collapsedGroups[key] = collapsedGroups[key] != true
+                                },
+                                onTest = {
+                                    onTestNodes(section.nodes.map { it.id }) { message ->
+                                        viewModel.postMessage(message)
+                                    }
+                                },
+                                onLongPress = section.group?.let { group ->
+                                    {
+                                        groupMenu = group
+                                        viewModel.dismissNodeHint()
+                                    }
+                                },
+                                // A folder with nothing in it says so, and says
+                                // where its own management lives — the generic
+                                // "long-press a node" would point at nothing.
+                                emptyText = stringResource(R.string.profiles_group_empty_body),
+                            ) {
+                                section.nodes.forEachIndexed { index, profile ->
+                                    // §5.2: rows settle in top-down instead of
+                                    // snapping in as a block. `appeared` lives
+                                    // out here so a row that scrolls away and
+                                    // back does not replay its entrance.
+                                    AppearOnFirstShow(
+                                        key = profile.id,
+                                        index = index,
+                                        seen = appeared,
+                                    ) {
+                                        SwipeToDeleteRow(
+                                            onDelete = { viewModel.deleteWithUndo(profile) },
+                                        ) {
+                                            NodeRow(
+                                                profile = profile,
+                                                health = state.health[profile.id],
+                                                disambiguator = disambiguators[profile.id],
+                                                selected = profile.id == state.selectedId,
+                                                highlighted = profile.id == highlightedNode,
+                                                showDivider = index != section.nodes.lastIndex,
+                                                onClick = { viewModel.select(profile.id) },
+                                                onLongClick = {
+                                                    rowMenu = profile
+                                                    viewModel.dismissNodeHint()
+                                                },
+                                                onTestClick = {
+                                                    onTestNode(profile.id) { msg ->
+                                                        viewModel.postMessage(msg)
+                                                    }
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     // Timed-out nodes are hidden by default: a subscription
                     // with hundreds of dead rows is a list you scroll once and
                     // never again. The rows are not deleted — a footer says how
                     // many are out of the way and brings them back.
-                    val timedOut = remember(state.profiles, state.health) {
-                        state.profiles.filter { state.health[it.id]?.status == NodeStatus.DOWN }
-                    }
-                    val shown = remember(state.profiles, state.health, showTimedOut) {
-                        if (showTimedOut) state.profiles else
-                            state.profiles.filterNot { state.health[it.id]?.status == NodeStatus.DOWN }
-                    }
-                    StarveilCard(
-                        modifier = Modifier
-                            .then(
-                                if (shown.isEmpty() && !state.loading) {
-                                    Modifier
-                                } else {
-                                    Modifier.weight(1f)
-                                },
-                            )
-                            .padding(
-                                start = StarveilSpacing.pageMargin,
-                                end = StarveilSpacing.pageMargin,
-                                // The card's own edge needs the same air as its
-                                // sides, or its lower corners are swallowed by
-                                // the navigation bar. The list's bottom padding
-                                // only clears the FAB.
-                                bottom = StarveilSpacing.pageMargin,
-                            ),
-                    ) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = StarveilSpacing.plusClearance),
-                    ) {
-                    if (state.loading && shown.isEmpty()) {
-                        // The card is already on screen while the database is
-                        // being read; five row-shaped placeholders keep it from
-                        // flashing the empty-state sentence first.
-                        items(SKELETON_ROWS) { index ->
-                            StarveilSkeletonRow(showDivider = index != SKELETON_ROWS - 1)
-                        }
-                    } else {
-                    itemsIndexed(shown, key = { _, profile -> profile.id }) { index, profile ->
-                        // §5.2: rows settle in top-down instead of snapping in
-                        // as a block. `appeared` lives out here so a row that
-                        // scrolls away and back does not replay its entrance.
-                        AppearOnFirstShow(key = profile.id, index = index, seen = appeared) {
-                            SwipeToDeleteRow(onDelete = { viewModel.deleteWithUndo(profile) }) {
-                                NodeRow(
-                                    profile = profile,
-                                    frontName = profile.frontNodeKey?.let { key -> frontNames[key] },
-                                    health = state.health[profile.id],
-                                    disambiguator = disambiguators[profile.id],
-                                    groupLabel = groupNames[profile.groupId]
-                                        ?: stringResource(R.string.profiles_group_none),
-                                    selected = profile.id == state.selectedId,
-                                    highlighted = profile.id == highlightedNode,
-                                    showDivider = index != shown.lastIndex || timedOut.isNotEmpty(),
-                                    onClick = { viewModel.select(profile.id) },
-                                    onLongClick = {
-                                        rowMenu = profile
-                                        viewModel.dismissNodeHint()
-                                    },
-                                    onTestClick = {
-                                        onTestNode(profile.id) { msg -> viewModel.postMessage(msg) }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                    // Nothing to show (an empty favourites filter, or a group
-                    // whose every node timed out) used to be a blank card the
-                    // height of the screen. One line says why the card is
-                    // short, and the card now ends where the line does.
-                    if (shown.isEmpty()) {
-                        item {
-                            Text(
-                                text = stringResource(R.string.profiles_list_empty),
-                                style = StarveilType.label,
-                                color = StarveilColors.ink2,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        horizontal = StarveilSpacing.lg,
-                                        vertical = StarveilSpacing.lg,
-                                    ),
-                            )
-                        }
-                    }
-                    }
                     if (timedOut.isNotEmpty()) {
-                        item {
-                            StarveilDivider(startInset = StarveilSpacing.lg)
-                            Row(
+                        item(key = "timed-out") {
+                            Text(
+                                text = stringResource(
+                                    if (showTimedOut) {
+                                        R.string.profiles_timed_out_shown
+                                    } else {
+                                        R.string.profiles_timed_out_hidden
+                                    },
+                                    timedOut.size,
+                                ),
+                                style = StarveilType.label,
+                                color = StarveilColors.accentText,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable(
@@ -708,24 +736,8 @@ fun ProfilesScreen(
                                         horizontal = StarveilSpacing.lg,
                                         vertical = StarveilSpacing.md,
                                     ),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = stringResource(
-                                        if (showTimedOut) {
-                                            R.string.profiles_timed_out_shown
-                                        } else {
-                                            R.string.profiles_timed_out_hidden
-                                        },
-                                        timedOut.size,
-                                    ),
-                                    style = StarveilType.label,
-                                    color = StarveilColors.accentText,
-                                )
-                            }
+                            )
                         }
-                    }
-                    }
                     }
                 }
             }
@@ -744,27 +756,7 @@ fun ProfilesScreen(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                // Clear of the add control: the message used to sit on top of
-                // it, so the one control the page is built around was covered
-                // exactly while a result was on screen.
-                .padding(bottom = StarveilSpacing.plusMarginBottom + FAB_CLEARANCE),
-        )
-
-        // The add control: the disc, 12dp above the bar and 18dp from the
-        // edge. The list's own bottom padding is what keeps its last row clear
-        // of it.
-        StarveilPlusDisc(
-            contentDescription = stringResource(R.string.add_panel_title_node),
-            onClick = {
-                clipboardText = readClipboardText(context)
-                addPanel = true
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(
-                    end = StarveilSpacing.plusMarginEnd,
-                    bottom = StarveilSpacing.plusMarginBottom,
-                ),
+                .padding(bottom = StarveilSpacing.navContentInset),
         )
     }
 
@@ -805,6 +797,19 @@ fun ProfilesScreen(
                 addPanel = false
                 viewModel.importSubscription(url, name)
             },
+        )
+    }
+
+    if (filterSheet) {
+        FilterSheet(
+            filter = state.filter,
+            groups = state.groups,
+            countries = countries,
+            onFavorites = viewModel::filterFavorites,
+            onCountry = viewModel::filterByCountry,
+            onGroup = viewModel::filterByGroup,
+            onClear = viewModel::clearFilter,
+            onDismiss = { filterSheet = false },
         )
     }
 
@@ -968,7 +973,10 @@ fun ProfilesScreen(
     // of this page's menus live. Edit is first because it is what a long-press
     // is usually for.
     rowMenu?.let { profile ->
-        val frontName = profile.frontNodeKey?.let(frontNames::get)
+        // Resolved here rather than from a map: one menu is open at a time, so
+        // one lookup is cheaper than keeping a directory for every row.
+        val frontName = profile.frontNodeKey
+            ?.let { key -> state.allProfiles.firstOrNull { it.nodeKey == key }?.name }
         val chainState = if (frontName == null) {
             stringResource(R.string.profiles_row_chain_unset)
         } else {
@@ -1540,15 +1548,8 @@ private fun SwipeToDeleteRow(onDelete: () -> Unit, content: @Composable () -> Un
 private fun NodeRow(
     profile: Profile,
     health: NodeHealth?,
-    /**
-     * The name of the node this one dials through, when it has one.
-     *
-     * Resolved by the caller: the row has a node, not a directory of nodes.
-     */
-    frontName: String? = null,
     /** Non-null only when another row shows the same name. */
     disambiguator: String?,
-    groupLabel: String,
     selected: Boolean,
     /** True for the row an import just created or found. */
     highlighted: Boolean = false,
@@ -1601,19 +1602,17 @@ private fun NodeRow(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                // One solid star per row, and it means one thing: this is the
-                // node the tunnel is on. The favourite mark is an outline, and
-                // it lives on the second line — a filled star beside a filled
-                // status dot was two blue marks saying different things.
-                if (selected) {
-                    StarveilStar(size = 13.dp)
-                } else {
-                    StatusDot(status = status)
-                }
+                // The dot always says how the node is doing; being the current
+                // node is a different fact, and it is said at the other end of
+                // the row by a check. One mark, one meaning, one place.
+                StatusDot(status = status)
                 Spacer(modifier = Modifier.width(StarveilSpacing.sm))
                 Text(
                     text = profile.displayName(),
-                    style = StarveilType.headline,
+                    // Regular weight: the name is an identifier in a list of
+                    // identifiers, not a heading. The card's header is the
+                    // heading, and the rows under it are its contents.
+                    style = StarveilType.body,
                     color = StarveilColors.ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1677,38 +1676,28 @@ private fun NodeRow(
                         )
                     }
                 }
+                // The slot is always there, so the numbers stay in one column
+                // whether a row is current or not.
+                Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                    if (selected) {
+                        Icon(
+                            imageVector = StarveilIcons.Check,
+                            contentDescription = stringResource(R.string.profiles_node_current),
+                            tint = accent,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(StarveilSpacing.xs))
-            val secondary = buildAnnotatedString {
-                if (selected && status == NodeStatus.DOWN) {
-                    withStyle(SpanStyle(color = StarveilColors.err)) {
-                        append(stringResource(R.string.profiles_selected_unreachable))
-                    }
-                    append(" · ")
-                }
-                append(groupLabel)
-                append(" · ")
-                append(profile.type.name.lowercase())
-                append(" · ")
-                // The host is elided in the middle, and the port is its own
-                // Text so it can never be the part that gets cut: "which port"
-                // is what tells two nodes on one host apart.
-                // The host gives way first: with a front on the row the chain
-                // is the new information, and the host is the part a user can
-                // afford to lose to an ellipsis. The compact form is
-                // "via <front>" — the exit is this row, so the arrow would be
-                // pointing at itself; the arrow order lives on the home card.
-                append(middleEllipsis(profile.server, if (frontName != null) SHORT_HOST_CHARS else HOST_CHARS))
-                if (frontName != null) {
-                    append(" · ")
-                    append(stringResource(R.string.profiles_row_via))
-                    append(" ")
-                    // The front's own name gives way next, but never past the
-                    // point where "via ..." stops reading as a chain.
-                    append(frontName.take(FRONT_NAME_MAX))
-                    if (frontName.length > FRONT_NAME_MAX) append("…")
-                }
-            }
+            // The second line is the address, and nothing else. The group is
+            // the card's header, the protocol is the badge on the first line,
+            // and the chain is in the long-press menu — three facts that used
+            // to be repeated here in one run of grey text. The host is elided
+            // in the middle and the port is its own Text so it can never be the
+            // part that gets cut: "which port" is what tells two nodes on one
+            // host apart.
+            val address = middleEllipsis(profile.server, HOST_CHARS)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1725,7 +1714,7 @@ private fun NodeRow(
                     Spacer(modifier = Modifier.width(StarveilSpacing.xs))
                 }
                 Text(
-                    text = secondary,
+                    text = address,
                     style = StarveilType.label,
                     color = StarveilColors.ink2,
                     maxLines = 1,
@@ -1970,6 +1959,16 @@ private val NODE_ROW_MIN_HEIGHT = 64.dp
 
 /** How many placeholders fill the card while the list is being read. */
 private const val SKELETON_ROWS = 5
+
+/**
+ * One card's worth of the list: a group, or no group at all, and the nodes shown
+ * under it.
+ *
+ * A value rather than grouping inside the LazyColumn's item lambda: the list's
+ * shape is then computed once per state change, and the highlight scroll can ask
+ * where a node is without a second traversal.
+ */
+private data class NodeSection(val group: ProxyGroup?, val nodes: List<Profile>)
 private val SELECTED_BORDER_WIDTH = 2.dp
 private val STATUS_DOT_SIZE = 8.dp
 private val SPARKLINE_WIDTH = 64.dp
@@ -1979,108 +1978,377 @@ private val SPARKLINE_HEIGHT = 20.dp
 private const val SELECTED_HALO_ALPHA = 0.16f
 
 /**
- * A group filter chip (design system §6.4): rounded rect, raised surface when
- * idle, brand glow when selected. The radius is fixed, not a percentage: a
- * percent radius follows the chip's height and width, so "全部" (two glyphs)
- * came out a circle while "Subscription" came out a capsule — one component
- * with two shapes on the same row.
+ * The pinned row: automatic selection, and the way back to it.
  *
- * Long-press opens group management. A tap has to stay the filter, so the
- * destructive actions cannot live there.
- */
-/**
- * The node list's search field.
- *
- * Its own row rather than the app bar's title slot: the bar already carries
- * three actions, and a title that turns into a field makes the two tabs that
- * are not this one feel like a mode change. `OutlinedTextField` at 48dp is the
- * same height as the chip row below it, so the two read as one control block.
- */
-/**
- * The global selection mode: automatic picks the fastest node, manual leaves
- * the choice to the user.
- *
- * A labelled row rather than two bare chips: "Fastest / By hand" alone would
- * read as a filter on the list, which is exactly what the group chips above
- * the list are. The label says this is about *how a node is chosen*.
+ * It replaces the Fastest / By hand segmented control. The control made the
+ * choice of a node look like a mode to set before picking one, and it left the
+ * default — the state almost everyone stays in — with no line of its own. This
+ * row states the default, names what it picked, and is itself the way back:
+ * tapping it in manual returns to automatic and picks immediately.
  */
 @Composable
-private fun SelectionModeRow(
+private fun AutoRow(
     mode: NodeSelectionMode,
-    onChange: (NodeSelectionMode) -> Unit,
+    currentLabel: String?,
+    currentMs: Long?,
+    onClick: () -> Unit,
 ) {
+    val auto = mode == NodeSelectionMode.AUTO
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                start = StarveilSpacing.pageMargin,
-                end = StarveilSpacing.pageMargin,
-                top = StarveilSpacing.sm,
-                bottom = StarveilSpacing.xs,
-            ),
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(horizontal = StarveilSpacing.pageMargin, vertical = StarveilSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = stringResource(R.string.profiles_selection_label),
-            style = StarveilType.label,
-            color = StarveilColors.ink2,
-            maxLines = 1,
+        Icon(
+            imageVector = StarveilIcons.Bolt,
+            contentDescription = null,
+            tint = if (auto) StarveilColors.accent else StarveilColors.ink2,
+            modifier = Modifier.size(18.dp),
         )
         Spacer(modifier = Modifier.width(StarveilSpacing.md))
-        StarveilSegmented(
-            options = listOf(
-                stringResource(R.string.profiles_selection_auto),
-                stringResource(R.string.profiles_selection_manual),
-            ),
-            selectedIndex = if (mode == NodeSelectionMode.AUTO) 0 else 1,
-            onSelect = { index ->
-                onChange(if (index == 0) NodeSelectionMode.AUTO else NodeSelectionMode.MANUAL)
-            },
-            modifier = Modifier.weight(1f),
-            proportional = true,
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.profiles_auto_title),
+                style = StarveilType.body,
+                color = StarveilColors.ink,
+                maxLines = 1,
+            )
+            Text(
+                text = when {
+                    !auto -> stringResource(R.string.profiles_auto_manual)
+                    currentLabel == null -> stringResource(R.string.profiles_auto_current_none)
+                    currentMs != null -> stringResource(
+                        R.string.profiles_auto_current,
+                        currentLabel,
+                        currentMs,
+                    )
+                    else -> stringResource(R.string.profiles_auto_current_plain, currentLabel)
+                },
+                style = StarveilType.label,
+                color = StarveilColors.ink2,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (auto) {
+            Icon(
+                imageVector = StarveilIcons.Check,
+                contentDescription = stringResource(R.string.profiles_auto_on),
+                tint = StarveilColors.accent,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }
 
+/**
+ * The one bar that narrows the list: search, and the filter at its end.
+ *
+ * One field rather than a search box with a second control beside it: both do
+ * the same job to the same list, and two rounded rectangles side by side read
+ * as two unrelated things. The funnel carries a dot when a filter is on, so the
+ * list cannot be narrowed by something invisible.
+ */
 @Composable
-private fun SearchField(
+private fun SearchFilterBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onClear: () -> Unit,
+    filterActive: Boolean,
+    onOpenFilter: () -> Unit,
 ) {
     StarveilSearchField(
         value = query,
         onValueChange = { next -> if (next.isEmpty()) onClear() else onQueryChange(next) },
         placeholder = stringResource(R.string.profiles_search_hint),
-        modifier = Modifier.padding(
-            start = StarveilSpacing.pageMargin,
-            end = StarveilSpacing.pageMargin,
-            top = StarveilSpacing.sm,
-        ),
+        trailing = {
+            Box {
+                IconButton(onClick = onOpenFilter, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = StarveilIcons.Filter,
+                        contentDescription = stringResource(
+                            if (filterActive) {
+                                R.string.profiles_filter_active
+                            } else {
+                                R.string.profiles_filter_open
+                            },
+                        ),
+                        tint = if (filterActive) StarveilColors.accent else StarveilColors.ink2,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                if (filterActive) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-6).dp, y = 6.dp)
+                            .size(6.dp)
+                            .background(StarveilColors.accent, CircleShape),
+                    )
+                }
+            }
+        },
     )
 }
 
+/**
+ * One group, as a card: a header, then its rows.
+ *
+ * The header is the group's identity and its facts in one line — name, mode,
+ * count — plus the two things you can do without opening the menu: fold it, or
+ * measure its nodes. The mode is a label, not a control: changing it stays in
+ * the long-press menu, where it has always been, and the two shapes cannot be
+ * mistaken for each other.
+ */
 @Composable
-private fun GroupChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
-    /** The tunnel goes through this group, as opposed to the list being filtered to it. */
-    inUse: Boolean = false,
+private fun GroupCard(
+    title: String,
+    modeLabel: String?,
+    count: Int,
+    collapsed: Boolean,
+    onToggle: () -> Unit,
+    onTest: () -> Unit,
+    onLongPress: (() -> Unit)?,
+    emptyText: String,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    val stateText = when {
-        inUse -> stringResource(R.string.profiles_group_state_in_use)
-        selected -> stringResource(R.string.profiles_group_state_selected)
-        else -> null
+    StarveilCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .combinedClickable(
+                    onClick = onToggle,
+                    onLongClick = onLongPress,
+                    role = Role.Button,
+                )
+                .padding(
+                    start = StarveilSpacing.lg,
+                    end = StarveilSpacing.sm,
+                    top = StarveilSpacing.xs,
+                    bottom = StarveilSpacing.xs,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = StarveilType.headline,
+                color = StarveilColors.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (modeLabel != null) {
+                Text(
+                    text = modeLabel.uppercase(),
+                    style = StarveilType.tech,
+                    color = StarveilColors.ink2,
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.width(StarveilSpacing.sm))
+            }
+            Text(
+                text = count.toString(),
+                style = StarveilType.tech,
+                color = StarveilColors.ink2,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.width(StarveilSpacing.xs))
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(role = Role.Button, onClick = onTest),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = StarveilIcons.Bolt,
+                    contentDescription = stringResource(R.string.profiles_group_test),
+                    tint = StarveilColors.accent,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            Icon(
+                imageVector = if (collapsed) StarveilIcons.Down else StarveilIcons.Up,
+                contentDescription = stringResource(
+                    if (collapsed) {
+                        R.string.profiles_group_expand
+                    } else {
+                        R.string.profiles_group_collapse
+                    },
+                ),
+                tint = StarveilColors.ink2,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        if (!collapsed) {
+            StarveilDivider(startInset = StarveilSpacing.lg)
+            if (count == 0) {
+                Text(
+                    text = emptyText,
+                    style = StarveilType.label,
+                    color = StarveilColors.ink2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = StarveilSpacing.lg,
+                            vertical = StarveilSpacing.md,
+                        ),
+                )
+            }
+            content()
+        }
     }
-    StarveilChip(
-        label = label,
-        selected = selected,
-        onClick = onClick,
-        onLongClick = onLongClick,
-        inUse = inUse,
-        stateDescription = stateText,
+}
+
+/**
+ * The filter sheet.
+ *
+ * A sheet rather than a row of chips on the page: the chips mixed favorites,
+ * "all", countries and subscription names in one horizontal strip that could
+ * not show what it held. Here each kind is a section, and the funnel that opens
+ * it is the only thing the page has to carry.
+ *
+ * A filter is still one value, not a set of switches — favorites, a country and
+ * a group are alternatives. Choosing one in any section replaces what the
+ * others had, which is why the favorites switch turns itself off when a country
+ * is picked.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun FilterSheet(
+    filter: NodeFilter,
+    groups: List<ProxyGroup>,
+    countries: List<String>,
+    onFavorites: (Boolean) -> Unit,
+    onCountry: (String?) -> Unit,
+    onGroup: (Long?) -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = StarveilColors.card,
+        shape = StarveilShapes.sheet,
+    ) {
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = StarveilSpacing.lg),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = StarveilSpacing.pageMargin, end = StarveilSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.profiles_filter_title),
+                    style = StarveilType.headline,
+                    color = StarveilColors.ink,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onClear, enabled = filter !is NodeFilter.All) {
+                    Text(
+                        text = stringResource(R.string.profiles_filter_clear),
+                        style = StarveilType.label,
+                        color = if (filter is NodeFilter.All) {
+                            StarveilColors.ink3
+                        } else {
+                            StarveilColors.accentText
+                        },
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(role = Role.Switch) {
+                        onFavorites(filter !is NodeFilter.Favorites)
+                    }
+                    .padding(
+                        start = StarveilSpacing.pageMargin,
+                        end = StarveilSpacing.md,
+                        top = StarveilSpacing.xs,
+                        bottom = StarveilSpacing.xs,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.profiles_filter_favorites),
+                    style = StarveilType.body,
+                    color = StarveilColors.ink,
+                    modifier = Modifier.weight(1f),
+                )
+                StarveilSwitch(
+                    checked = filter is NodeFilter.Favorites,
+                    onCheckedChange = onFavorites,
+                )
+            }
+            if (countries.isNotEmpty()) {
+                FilterSection(stringResource(R.string.profiles_filter_country))
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = StarveilSpacing.pageMargin),
+                    horizontalArrangement = Arrangement.spacedBy(StarveilSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(StarveilSpacing.sm),
+                ) {
+                    countries.forEach { iso ->
+                        val selected = filter == NodeFilter.Country(iso)
+                        StarveilChip(
+                            // The code, not a translated country name: the name
+                            // is the locale's business and the flag already says
+                            // which country this is.
+                            label = CountryFlags.flag(iso)?.let { "$it $iso" } ?: iso,
+                            selected = selected,
+                            onClick = { onCountry(if (selected) null else iso) },
+                            surface = ChipSurface.Dialog,
+                        )
+                    }
+                }
+            }
+            if (groups.isNotEmpty()) {
+                FilterSection(stringResource(R.string.profiles_filter_groups))
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = StarveilSpacing.pageMargin),
+                    horizontalArrangement = Arrangement.spacedBy(StarveilSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(StarveilSpacing.sm),
+                ) {
+                    groups.forEach { group ->
+                        val selected = filter == NodeFilter.Group(group.id)
+                        StarveilChip(
+                            label = group.name,
+                            selected = selected,
+                            onClick = { onGroup(if (selected) null else group.id) },
+                            surface = ChipSurface.Dialog,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A section caption inside the filter sheet. */
+@Composable
+private fun FilterSection(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = StarveilType.tech,
+        color = StarveilColors.ink2,
+        modifier = Modifier.padding(
+            start = StarveilSpacing.pageMargin,
+            end = StarveilSpacing.pageMargin,
+            top = StarveilSpacing.lg,
+            bottom = StarveilSpacing.sm,
+        ),
     )
 }
 
@@ -2489,12 +2757,6 @@ private const val NAME_PREFIX_CHARS = 12
 private const val HOST_CHARS = 20
 
 /** "a-very-long-subdomain.example.com" -> "a-very-lon…ample.com". */
-/**
- * How much of the host survives when the row also has to say what it dials
- * through. The chain is the new information, so the host is what gives way.
- */
-private const val SHORT_HOST_CHARS = 16
-
 /** Long enough to recognise a node, short enough to leave room for "via". */
 private const val FRONT_NAME_MAX = 14
 

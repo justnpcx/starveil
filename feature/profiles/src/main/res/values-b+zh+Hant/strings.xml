@@ -3,7 +3,6 @@
     <string name="profiles_title">節點</string>
     <string name="profiles_empty_title">還沒有節點</string>
     <string name="profiles_empty_body">匯入訂閱或分享連結來新增節點。</string>
-    <string name="profiles_list_empty">這裡還沒有可顯示的節點。長按節點可以收藏或管理。</string>
     <string name="profiles_latency_untested">未測</string>
     <string name="profiles_latency_ms">%1$d ms</string>
     <string name="profiles_latency_timeout">逾時</string>
@@ -49,7 +48,6 @@
     <string name="add_clipboard_form_title">從剪貼簿匯入</string>
     <string name="add_clipboard_form_paste">貼上</string>
     <string name="add_clipboard_form_formats">支援 vless、vmess、trojan、ss、hysteria2、tuic 連結，每行一條；也可以填訂閱位址。</string>
-    <string name="profiles_refreshed">已重新整理 · 延遲已更新</string>
     <string name="add_panel_label_batch">批次匯入</string>
     <string name="add_subscription_done">已匯入訂閱 %1$s · 新增 %2$d 個節點</string>
     <string name="add_view">檢視</string>
@@ -78,7 +76,6 @@
     <string name="profiles_dialog_scene_name">場景名</string>
     <string name="profiles_dialog_create">建立</string>
 
-    <string name="profiles_test_selected">測試所選節點</string>
     <string name="profiles_new_node_title">選擇協議</string>
     <string name="profiles_row_edit">編輯</string>
     <string name="profiles_row_share">分享</string>
@@ -113,12 +110,10 @@
     <string name="profiles_chain_exit">出口節點：%1$s</string>
     <string name="profiles_chain_direct">直連：該節點自己撥號</string>
     <string name="profiles_chain_path">%1$s → %2$s</string>
-    <string name="profiles_row_via">經</string>
     <string name="profiles_chain_none">無前置節點</string>
     <string name="profiles_chain_clear">清除前置</string>
     <string name="profiles_chain_no_candidates">沒有可用作前置的節點：已經帶前置的節點不能再當前置。</string>
     <string name="profiles_row_move">移到分組</string>
-    <string name="profiles_group_all">全部</string>
     <string name="profiles_search_hint">搜尋名稱或位址</string>
     <string name="profiles_search_clear">清除搜尋</string>
     <string name="profiles_no_search_title">沒有匹配的節點</string>
@@ -223,7 +218,6 @@
     <string name="profiles_probe_note_reality">不適用 · REALITY 需核心的 uTLS 握手</string>
     <string name="profiles_probe_note_no_tls">不適用 · 無 TLS 層</string>
     <string name="profiles_probe_note_no_http">不適用 · 代理協議不是 HTTP</string>
-    <string name="profiles_selected_unreachable">選中但不可達</string>
 <string name="profiles_favorites">收藏</string>
     <string name="profiles_favorite_add">收藏並置頂</string>
     <string name="profiles_favorite_remove">取消收藏</string>
@@ -233,7 +227,23 @@
     <string name="profiles_share_copy_json">複製 sing-box JSON</string>
     <string name="profiles_share_json_copied">JSON 已複製</string>
     <string name="profiles_detail_chart_desc">「%1$s」的延遲歷史。</string>
-    <string name="profiles_selection_label">選擇方式</string>
-    <string name="profiles_selection_auto">自動選最快</string>
-    <string name="profiles_selection_manual">手動選節點</string>
+    <string name="profiles_test_all">全部測速</string>
+    <string name="profiles_add_or_import">新增或匯入</string>
+    <string name="profiles_node_current">目前節點</string>
+    <string name="profiles_auto_title">自動選最快</string>
+    <string name="profiles_auto_manual">點按切回自動選擇</string>
+    <string name="profiles_auto_current_none">尚未選取節點</string>
+    <string name="profiles_auto_current">目前：%1$s · %2$d ms</string>
+    <string name="profiles_auto_current_plain">目前：%1$s</string>
+    <string name="profiles_auto_on">已啟用自動選擇</string>
+    <string name="profiles_filter_open">篩選節點</string>
+    <string name="profiles_filter_active">已啟用篩選</string>
+    <string name="profiles_filter_title">篩選</string>
+    <string name="profiles_filter_clear">清除篩選</string>
+    <string name="profiles_filter_favorites">僅收藏</string>
+    <string name="profiles_filter_country">國家</string>
+    <string name="profiles_filter_groups">訂閱與分組</string>
+    <string name="profiles_group_test">測速本組</string>
+    <string name="profiles_group_expand">展開分組</string>
+    <string name="profiles_group_collapse">收合分組</string>
 </resources>

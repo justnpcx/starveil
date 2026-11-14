@@ -11,6 +11,9 @@ import com.justnpcx.starveil.core.model.WEIGHT_MANUAL
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 
 /**
@@ -118,6 +121,36 @@ class NodeLatencyTester @Inject constructor(
             ProbeResult.Unsupported ->
                 LatencyTestResult(context.getString(R.string.latency_not_applicable), false)
         }
+    }
+
+    /**
+     * Measures a batch — a group's nodes, or every node — and says how many
+     * answered.
+     *
+     * A few at a time rather than one after another: a subscription can hold a
+     * hundred nodes, and at three seconds of timeout each a sequential sweep is
+     * a progress-free five minutes. Six keeps the radio busy without turning a
+     * tap into a hundred simultaneous handshakes.
+     *
+     * Each node is measured by the same [testNode] a single tap uses, so the
+     * batch writes exactly what the individual taps would have written — no
+     * second code path, no second idea of what a measurement is.
+     */
+    suspend fun testNodes(ids: List<Long>): String {
+        if (ids.isEmpty()) return context.getString(R.string.latency_no_node)
+        var reachable = 0
+        ids.chunked(BATCH_SIZE).forEach { chunk ->
+            val results = coroutineScope {
+                chunk.map { id -> async { testNode(id) } }.awaitAll()
+            }
+            reachable += results.count { it.measured }
+        }
+        return context.getString(R.string.latency_batch, ids.size, reachable)
+    }
+
+    private companion object {
+        /** Handshakes in flight at once during a sweep. */
+        const val BATCH_SIZE = 6
     }
 }
 

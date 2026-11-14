@@ -6,4 +6,5 @@
     <string name="latency_unreachable">無法連到節點——其埠沒有 TCP 回應。</string>
     <string name="latency_resolution_failed">節點網域解析失敗。</string>
     <string name="latency_not_applicable">無法測量——WireGuard 只走 UDP，而這次探測是 TCP 握手。</string>
+    <string name="latency_batch">已測 %1$d 個 · %2$d 個可達</string>
 </resources>
