@@ -8,6 +8,28 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.30] — 2026-11-14
+
+### Changed
+
+- **The home page has one card and one control.** The node card and the exit
+  card are one card with a hairline between them: the node on one line (flag,
+  name, latency, availability), the exit's three rows below it. Both halves
+  are real buttons — a keyboard or a D-pad can focus them and sees a focus
+  ring.
+- **The auto/manual control moved to the Nodes page.** A labelled "Selection —
+  Fastest / By hand" row sits above the search field; the group mode stays
+  where it was, in a group's long-press menu.
+- **The recent rows are one line each**, under a header inside their own card.
+  The brand rule under the home title is gone.
+
+### Fixed
+
+- The page fits a 360×800 window at its fullest (a selected node and three
+  recent rows), and at the largest font size nothing is cut: the traffic block
+  grows instead of clipping its total, and an exit value may take a second
+  line.
+
 ## [0.9.29] — 2026-11-13
 
 ### Changed
