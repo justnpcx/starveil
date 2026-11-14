@@ -26,9 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import com.justnpcx.starveil.core.ui.icons.StarveilIcons
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -263,7 +260,6 @@ fun DashboardScreen(
                     onSelect = viewModel::selectRecentNode,
                     rowPadding = metrics.rowPadding,
                     rowMin = metrics.recentRowMin,
-                    headerPadding = metrics.headerPadding,
                 )
             }
 
@@ -877,11 +873,12 @@ private fun NodeZone(name: String, health: NodeHealth?, padding: Dp, rowPadding:
 }
 
 /**
- * The recent rows, with their own header.
+ * The recent rows, without a header.
  *
- * The header lives inside the card: "Recent" was a caption floating above a
- * card, which read as a section of the page rather than as the card's own
- * title. The clock is the one glyph that says "used before" without a word.
+ * The card had a clock glyph and a "Recent" caption, which cost about 28dp of
+ * the one screen the page must fit on. The rows are the card's whole content
+ * and each one is a node the app has used; the caption named what the rows
+ * already are, so it went and the first row now meets the card's top edge.
  */
 @Composable
 private fun RecentCard(
@@ -889,29 +886,8 @@ private fun RecentCard(
     onSelect: (Long) -> Unit,
     rowPadding: Dp,
     rowMin: Dp,
-    headerPadding: Dp,
 ) {
     StarveilCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = StarveilSpacing.lg, vertical = headerPadding),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = StarveilIcons.Clock,
-                contentDescription = null,
-                tint = StarveilColors.ink2,
-                modifier = Modifier.size(14.dp),
-            )
-            Spacer(modifier = Modifier.width(StarveilSpacing.sm))
-            Text(
-                text = stringResource(R.string.dashboard_recent_title).uppercase(),
-                style = StarveilType.tech,
-                color = StarveilColors.ink2,
-            )
-        }
-        StarveilDivider(startInset = StarveilSpacing.lg)
         nodes.forEachIndexed { index, node ->
             RecentNodeRow(
                 node = node,
@@ -1055,8 +1031,6 @@ private data class HomeMetrics(
     val rowPadding: Dp,
     /** The recent rows' floor, so a row stays a touch target. */
     val recentRowMin: Dp,
-    /** Vertical padding of the recent card's header. */
-    val headerPadding: Dp,
     /**
      * Whether an empty status slot collapses to nothing.
      *
@@ -1078,7 +1052,6 @@ private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
         bottomGap = StarveilSpacing.md,
         rowPadding = 10.dp,
         recentRowMin = 40.dp,
-        headerPadding = 6.dp,
         collapseEmptySlot = true,
     )
     contentHeight >= 560.dp -> HomeMetrics(
@@ -1091,7 +1064,6 @@ private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
         bottomGap = StarveilSpacing.sm,
         rowPadding = StarveilSpacing.sm,
         recentRowMin = 36.dp,
-        headerPadding = StarveilSpacing.xs,
         collapseEmptySlot = true,
     )
     else -> HomeMetrics(
@@ -1104,7 +1076,6 @@ private fun homeMetricsFor(contentHeight: Dp): HomeMetrics = when {
         bottomGap = StarveilSpacing.xs,
         rowPadding = 6.dp,
         recentRowMin = 34.dp,
-        headerPadding = 4.dp,
         collapseEmptySlot = true,
     )
 }
