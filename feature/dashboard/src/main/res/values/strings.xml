@@ -58,8 +58,6 @@
     <string name="dashboard_failure_close">Close</string>
     <string name="dashboard_failure_copy">Copy</string>
     <string name="dashboard_notice_kernel_refused_reason">Kernel failed to start: %1$s</string>
-    <string name="dashboard_mode_auto">Auto</string>
-    <string name="dashboard_mode_manual">Manual</string>
     <string name="dashboard_hint_connect">Tap to connect</string>
     <string name="dashboard_hint_disconnect">Tap to disconnect</string>
     <string name="dashboard_hint_connecting">Bringing the tunnel up</string>

@@ -52,10 +52,8 @@ import com.justnpcx.starveil.core.kernel.TrafficStats
 import com.justnpcx.starveil.core.model.NodeHealth
 import com.justnpcx.starveil.core.model.displayName
 import com.justnpcx.starveil.core.model.RecommendationReason
-import com.justnpcx.starveil.core.model.NodeSelectionMode
 import com.justnpcx.starveil.core.ui.components.StarveilSnackbarHost
 import com.justnpcx.starveil.core.ui.components.ConnectionCore
-import com.justnpcx.starveil.core.ui.components.StarveilSegmented
 import com.justnpcx.starveil.core.ui.components.ConnectionCoreGeometry
 import com.justnpcx.starveil.core.ui.components.ConnectionState
 import com.justnpcx.starveil.core.ui.components.NodeHealthChart
@@ -240,10 +238,8 @@ fun DashboardScreen(
             CurrentNodeCard(
                 name = state.selectedNodeName ?: stringResource(R.string.dashboard_no_node),
                 health = state.health,
-                mode = state.selectionMode,
                 onOpen = onOpenNodes,
                 onOpenHealth = { healthOpen = true },
-                onModeChange = viewModel::setSelectionMode,
                 padding = metrics.cardPadding,
             )
 
@@ -844,11 +840,9 @@ private fun formatScaledParts(value: Double, units: List<String>): RateParts {
 private fun CurrentNodeCard(
     name: String,
     health: NodeHealth?,
-    mode: NodeSelectionMode,
     onOpen: () -> Unit,
     /** The health dialog's only entry point now that its card is gone. */
     onOpenHealth: () -> Unit,
-    onModeChange: (NodeSelectionMode) -> Unit,
     padding: Dp = StarveilSpacing.lg,
 ) {
     StarveilCard(onClick = onOpen) {
@@ -893,30 +887,7 @@ private fun CurrentNodeCard(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(StarveilSpacing.md))
-                    Text(
-                        text = stringResource(
-                            if (mode == NodeSelectionMode.AUTO) {
-                                R.string.dashboard_mode_auto
-                            } else {
-                                R.string.dashboard_mode_manual
-                            },
-                        ),
-                        style = StarveilType.label,
-                        color = StarveilColors.ink2,
-                    )
                 }
-                Spacer(modifier = Modifier.height(StarveilSpacing.md))
-                StarveilSegmented(
-                    options = listOf(
-                        stringResource(R.string.dashboard_mode_auto),
-                        stringResource(R.string.dashboard_mode_manual),
-                    ),
-                    selectedIndex = if (mode == NodeSelectionMode.AUTO) 0 else 1,
-                    onSelect = { index ->
-                        onModeChange(if (index == 0) NodeSelectionMode.AUTO else NodeSelectionMode.MANUAL)
-                    },
-                )
             }
         }
     }
