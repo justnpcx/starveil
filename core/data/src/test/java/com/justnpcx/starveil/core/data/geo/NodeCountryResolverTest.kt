@@ -1,6 +1,8 @@
 package com.justnpcx.starveil.core.data.geo
 
 import kotlinx.coroutines.runBlocking
+import java.util.Locale
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -19,6 +21,14 @@ class NodeCountryResolverTest {
     private var resolves = 0
     private var address: String? = null
     private var country: String? = "US"
+
+    /** The JVM's default locale, restored after every test that changes it. */
+    private val originalLocale: Locale = Locale.getDefault()
+
+    @After
+    fun restoreLocale() {
+        Locale.setDefault(originalLocale)
+    }
 
     private val resolver = NodeCountryResolver(
         resolveHost = { resolves++; address },
@@ -87,5 +97,61 @@ class NodeCountryResolverTest {
         country = "DE"
         assertEquals("DE", resolver.countryOf("b.example"))
         assertEquals(2, resolves)
+    }
+
+    @Test
+    fun `a private address takes the device's country`() = runBlocking {
+        // GeoIP has nothing to say about 192.168/16 by design. A node there is
+        // on this network, so the phone's own region is the honest answer —
+        // and the United Nations flag would be a lie about a machine in the
+        // next room.
+        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
+        address = "192.168.1.10"
+        country = null
+
+        assertEquals("CN", resolver.countryOf("lan.example"))
+    }
+
+    @Test
+    fun `loopback and link-local addresses take it too`() = runBlocking {
+        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
+        country = null
+
+        address = "127.0.0.1"
+        assertEquals("CN", resolver.countryOf("loopback.example"))
+        address = "169.254.1.1"
+        assertEquals("CN", resolver.countryOf("link-local.example"))
+    }
+
+    @Test
+    fun `a public address the database does not know stays unknown`() = runBlocking {
+        // TEST-NET-3 is public address space with no geo entry. Falling back to
+        // the phone's region here would put a foreign node in the user's own
+        // country.
+        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
+        address = "203.0.113.9"
+        country = null
+
+        assertNull(resolver.countryOf("unknown.example"))
+    }
+
+    @Test
+    fun `a locale without a country has no answer to give`() = runBlocking {
+        Locale.setDefault(Locale.forLanguageTag("zh"))
+        address = "192.168.1.10"
+        country = null
+
+        assertNull(resolver.countryOf("language-only.example"))
+    }
+
+    @Test
+    fun `a three-letter country is not a country code`() = runBlocking {
+        // A malformed region must not be written into the profile: the field is
+        // an ISO alpha-2 code and the flag is built from it.
+        Locale.setDefault(Locale("zh", "CHN"))
+        address = "192.168.1.10"
+        country = null
+
+        assertNull(resolver.countryOf("bad-region.example"))
     }
 }
