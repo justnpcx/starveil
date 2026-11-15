@@ -93,8 +93,6 @@ data class StarveilPalette(
      * tile, so it follows the list's grammar instead of re-tinting the logo.
      */
     val hubAboutInk: Color,
-    /** The gauze woven across the connection card. */
-    val veil: Color,
     /** Page bloom: pink, blue, purple. Static, never animated. */
     val washPink: Color,
     val washBlue: Color,
@@ -182,7 +180,6 @@ val LightPalette = StarveilPalette(
     hubSettings = HubTone(bg = Color(0xFFFDEEE2), ink = Color(0xFFD96C00)),
     hubAboutBed = Color(0xFFF1EFFD),
     hubAboutInk = Color(0xFF6C4BD8),
-    veil = Color(0x0C7C6CF0),
     washPink = Color(0x14E85D9E),
     washBlue = Color(0x144285F4),
     washPurple = Color(0x107C6CF0),
@@ -220,7 +217,6 @@ val DarkPalette = StarveilPalette(
     hubSettings = HubTone(bg = Color(0xFF3A2A1A), ink = Color(0xFFF0A35E)),
     hubAboutBed = Color(0xFF2A2440),
     hubAboutInk = Color(0xFFB79CFF),
-    veil = Color(0x0CA8C7FA),
     washPink = Color(0x18E85D9E),
     washBlue = Color(0x184285F4),
     washPurple = Color(0x1C7C6CF0),
