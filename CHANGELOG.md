@@ -8,6 +8,26 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.36] — 2026-11-15
+
+### Changed
+
+- **The traffic block dims by colour, not by opacity.** With no tunnel the
+  numbers drop to secondary ink instead of the whole block being drawn at 38%,
+  which was the app's only opacity-as-state and lighter than the fade the exit
+  rows had already dropped for being unreadable on device. The labels, units
+  and totals are unchanged; the block's height is unchanged.
+- **The rule editor's first tile is its default.** The matcher grid now lists
+  domain suffix first, so the most common kind is both the first tile and the
+  pre-selected one, matching the action control. Stored rules are unaffected:
+  the database and the config keep wire names, not positions.
+
+### Fixed
+
+- Two notes that had gone stale — the country field still described the 0.9.34
+  fallback, the card still described the old glass surface — and a colour token
+  (`veil`) that no longer had a reader.
+
 ## [0.9.35] — 2026-11-15
 
 ### Changed
