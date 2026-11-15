@@ -74,7 +74,7 @@ enum class ConnectionState {
  *
  * Inside the ring, top to bottom: the star, the state word, and one line that
  * says what a tap will do. Connected draws the brand gradient; disconnected
- * draws the same shape hollow in [StarveilColors.ringOff].
+ * draws the same shape hollow, in the state's own colour.
  */
 @Composable
 fun ConnectionCore(
@@ -159,7 +159,10 @@ fun ConnectionCore(
     val accent = StarveilColors.accent
     val warnColor = StarveilColors.warn
     val errColor = StarveilColors.err
-    val idleRing = StarveilColors.ringOff
+    // Amber while nothing is connected: a grey ring reads as unavailable, and
+    // this is the control's resting state, not an error. Solid and still — the
+    // gradient and the spin belong to the states where something is happening.
+    val idleRing = StarveilColors.standby
 
     Box(
         modifier = modifier
@@ -238,6 +241,14 @@ fun ConnectionCore(
         ) {
             StarveilStar(
                 filled = state == ConnectionState.CONNECTED || state == ConnectionState.WARNING,
+                // Disconnected takes the ring's amber; blocked keeps the grey,
+                // because there the red ring is the state and the star is only
+                // a silhouette.
+                hollow = if (state == ConnectionState.DISCONNECTED) {
+                    idleRing
+                } else {
+                    StarveilColors.ringOff
+                },
                 size = 30.dp,
             )
             Spacer(modifier = Modifier.height(10.dp))

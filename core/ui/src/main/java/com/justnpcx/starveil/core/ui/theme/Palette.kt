@@ -54,6 +54,16 @@ data class StarveilPalette(
     val ok: Color,
     /** Attention. */
     val warn: Color,
+    /**
+     * Standby: the ring's colour while nothing is connected.
+     *
+     * A state colour, so it never follows the accent preset — the same rule as
+     * [ok], [err] and [warn]. Amber rather than grey because a grey ring reads
+     * as switched off or unavailable, and this is the control's resting state,
+     * ready for a tap. Deliberately not [warn]: warning is a fault, and its
+     * hue is a different, darker amber in the day and a peach at night.
+     */
+    val standby: Color,
     /** The ring when nothing is connected. */
     val ringOff: Color,
     /** A brand mark's bed: the pale accent a link icon sits on. */
@@ -158,6 +168,7 @@ val LightPalette = StarveilPalette(
     err = Color(0xFFB3261E),
     ok = Color(0xFF137333),
     warn = Color(0xFFAC4D00),
+    standby = Color(0xFFD97706),
     ringOff = Color(0xFFC4C7C5),
     accentSoft = Color(0xFFE8F0FE),
     floatDisc = Color(0xFFFFFFFF),
@@ -195,6 +206,7 @@ val DarkPalette = StarveilPalette(
     ok = Color(0xFF81C995),
     // Measured 10.92:1 on bg / 9.71:1 on card, so the candidate stands.
     warn = Color(0xFFFFB59E),
+    standby = Color(0xFFF2B544),
     ringOff = Color(0xFF5F6368),
     accentSoft = Color(0xFF26303F),
     floatDisc = Color(0xFF232426),

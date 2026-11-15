@@ -71,6 +71,8 @@ object StarveilColors {
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.ok
     val warn: Color
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.warn
+    val standby: Color
+        @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.standby
     val ringOff: Color
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.ringOff
     val accentSoft: Color

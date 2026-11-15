@@ -17,18 +17,24 @@ import com.justnpcx.starveil.core.ui.theme.StarveilColors
 /**
  * The four-point star: the brand's one shape.
  *
- * Filled it carries the 135-degree brand gradient; hollow it is a 1.5dp ring
- * in [StarveilColors.ringOff]. The silhouette is the same in both modes and at
- * every size, so the 13dp list mark, the 30dp ring mark and the launcher icon
- * are recognisably one thing.
+ * Filled it carries the 135-degree brand gradient; hollow it is a 1.5dp outline
+ * in [hollow]. The silhouette is the same in both modes and at every size, so
+ * the 13dp list mark, the 30dp ring mark and the launcher icon are recognisably
+ * one thing.
+ *
+ * [hollow] defaults to the idle grey, and the connection ring passes the
+ * standby amber when it is disconnected — the star and the ring around it are
+ * one object, so they take the same colour in that state.
  */
 @Composable
 fun StarveilStar(
     modifier: Modifier = Modifier,
     filled: Boolean = true,
     size: Dp = 30.dp,
+    /** The outline's colour when [filled] is false. */
+    hollow: Color = StarveilColors.ringOff,
 ) {
-    val off = StarveilColors.ringOff
+    val off = hollow
     Canvas(modifier = modifier.size(size)) {
         val r = this.size.minDimension / 2f
         val c = Offset(this.size.width / 2f, this.size.height / 2f)
