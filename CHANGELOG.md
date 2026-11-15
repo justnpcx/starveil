@@ -8,6 +8,33 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.33] — 2026-11-15
+
+### Changed
+
+- **The disconnected ring is amber.** Grey read as switched off; amber says
+  standby — the control is at rest and a tap connects. The ring and the star
+  inside it take the same colour, solid and still, and the colour is fixed in
+  both themes: it never follows the accent preset, and it is not the warning
+  colour, because nothing is wrong.
+- **The session card is tinted, and its row says "Current".** Two white cards
+  with the same rows left the reader to work out which one was live. The card
+  that holds the tunnel now has its own face and an inline label after the node
+  name; the recent card stays plain, and its rows carry no label.
+- **A node on the local network takes the device's country.** GeoIP cannot
+  place a private address, so a home node was labelled with the United Nations
+  flag — which says "somewhere else" about a machine in the same room. Private,
+  loopback and link-local addresses now get the device's own region; a public
+  address the database does not know still gets no flag.
+- **The home rows show the latency alone.** "407 ms · online 100%" was either
+  no information or wrong for a node the tunnel is carrying traffic through,
+  and nothing on screen defined its window. Availability still ranks nodes for
+  automatic selection and is still drawn on the health card.
+
+### Fixed
+
+- The last of the floating add button: an unused import and two comments.
+
 ## [0.9.32] — 2026-11-14
 
 ### Changed
