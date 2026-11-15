@@ -57,6 +57,14 @@ fun StarveilCard(
      * bounding rectangle and the corners leak.
      */
     onClick: (() -> Unit)? = null,
+    /**
+     * The card's face.
+     *
+     * Defaults to the palette's card colour. The one caller that passes
+     * something else is the home page's session card, whose tint is what tells
+     * it apart from the list of past nodes.
+     */
+    face: Color = StarveilColors.surfaceGlass,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     // Two shadows in the day, one at night.
@@ -106,7 +114,7 @@ fun StarveilCard(
                 },
             )
             .clip(StarveilShapes.card)
-            .background(StarveilColors.surfaceGlass)
+            .background(face)
             .border(1.dp, StarveilColors.glassBorder, StarveilShapes.card)
             .then(
                 if (onClick == null) {

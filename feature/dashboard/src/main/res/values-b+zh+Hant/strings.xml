@@ -38,8 +38,8 @@
     <string name="dashboard_notice_auto_selected">已自動選擇 %1$s——%2$s。</string>
     <string name="dashboard_notice_switching_node">連線已斷開，正在嘗試另一個節點。</string>
     <string name="dashboard_notice_tunnel_silent">已連線，但沒有任何流量透過。節點可能已失效或配置有誤。</string>
-    <string name="dashboard_reason_health">線上率 %1$d%% · 延遲 %2$d ms</string>
-    <string name="dashboard_reason_health_no_latency">線上率 %1$d%%</string>
+    <string name="dashboard_reason_health">延遲 %1$d ms</string>
+    <string name="dashboard_reason_health_no_latency">延遲未測得</string>
     <string name="dashboard_reason_tied">%1$s（同分）</string>
     <string name="dashboard_reason_tied_region">%1$s（同分，優先 %2$s）</string>
     <string name="dashboard_reason_cooling_down">所有節點都在冷卻，還剩 %1$d 分鐘</string>
@@ -68,7 +68,7 @@
     <string name="dashboard_exit_no_record">暫無記錄</string>
     <string name="dashboard_exit_session_today">今天 %1$s 開始 · 進行中</string>
     <string name="dashboard_exit_session_date">%1$s 開始 · 進行中</string>
-    <string name="dashboard_recent_health">%1$d ms · 線上 %2$d%%</string>
+    <string name="dashboard_recent_health">%1$d ms</string>
     <string name="dashboard_recent_untested">未測得</string>
     <string name="dashboard_exit_last_address">上次出口 IP</string>
     <string name="dashboard_exit_last_latency">上次出口延遲</string>
@@ -76,4 +76,5 @@
     <string name="dashboard_exit_last_empty">暫無上次會話</string>
     <string name="dashboard_exit_last_today_value">今天 %1$s</string>
     <string name="dashboard_exit_last_date_value">%1$s</string>
+    <string name="dashboard_current">目前</string>
 </resources>

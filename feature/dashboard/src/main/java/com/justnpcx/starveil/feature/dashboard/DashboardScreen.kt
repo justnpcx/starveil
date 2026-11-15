@@ -693,10 +693,10 @@ private fun DashboardNotice.text(): String = when (this) {
  */
 @Composable
 private fun RecommendationReason.text(): String = when (this) {
-    is RecommendationReason.Healthiest -> healthClause(availabilityPct, latencyMs)
+    is RecommendationReason.Healthiest -> healthClause(latencyMs)
     is RecommendationReason.TiedOnScore -> region
-        ?.let { stringResource(R.string.dashboard_reason_tied_region, healthClause(availabilityPct, latencyMs), it.displayName) }
-        ?: stringResource(R.string.dashboard_reason_tied, healthClause(availabilityPct, latencyMs))
+        ?.let { stringResource(R.string.dashboard_reason_tied_region, healthClause(latencyMs), it.displayName) }
+        ?: stringResource(R.string.dashboard_reason_tied, healthClause(latencyMs))
     is RecommendationReason.AllCoolingDown ->
         stringResource(R.string.dashboard_reason_cooling_down, minutesLeft)
     RecommendationReason.NothingMeasured ->
@@ -707,13 +707,14 @@ private fun RecommendationReason.text(): String = when (this) {
  * What the picker saw, in the units the user measures in.
  *
  * The score is a 0–10099 internal number. It is deliberately not shown:
- * "score 10099" is precise about the wrong thing, and the two numbers it is
- * made of are the ones a person can check against the health chart above.
+ * "score 10099" is precise about the wrong thing. The availability half of it
+ * is not shown either — the row it explains no longer carries a percentage, and
+ * a reason that quotes one would be the last place the number still appeared.
  */
 @Composable
-private fun healthClause(availabilityPct: Int, latencyMs: Long?): String =
-    latencyMs?.let { stringResource(R.string.dashboard_reason_health, availabilityPct, it) }
-        ?: stringResource(R.string.dashboard_reason_health_no_latency, availabilityPct)
+private fun healthClause(latencyMs: Long?): String =
+    latencyMs?.let { stringResource(R.string.dashboard_reason_health, it) }
+        ?: stringResource(R.string.dashboard_reason_health_no_latency)
 
 /**
  * The telemetry block: two columns, mirrored about the screen's centre.
@@ -859,11 +860,16 @@ private fun ConnectionCard(
 ) {
     val connected = state.connectionState == ConnectionState.CONNECTED ||
         state.connectionState == ConnectionState.WARNING
-    StarveilCard(modifier = Modifier.fillMaxWidth()) {
+    // The session card is tinted: the same rows in two white cards left the
+    // reader to work out which one is live from position alone, and the first
+    // thing this card holds is the node in force. The tint is structural — it
+    // does not change with the connection's state.
+    StarveilCard(modifier = Modifier.fillMaxWidth(), face = StarveilColors.sessionCard) {
         CardZone(onClick = onOpenNodes) {
             NodeZone(
                 name = state.selectedNodeName ?: stringResource(R.string.dashboard_no_node),
                 health = state.health,
+                current = state.selectedNodeName != null,
                 padding = padding,
                 rowPadding = rowPadding,
             )
@@ -931,14 +937,38 @@ private fun CardZone(
  * and the numbers never wrap, so a long node name cannot push them off.
  */
 @Composable
-private fun NodeZone(name: String, health: NodeHealth?, padding: Dp, rowPadding: Dp) {
+private fun NodeZone(
+    name: String,
+    health: NodeHealth?,
+    /** True when this card's node is a node: the row then says "current". */
+    current: Boolean,
+    padding: Dp,
+    rowPadding: Dp,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = padding, vertical = rowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NodeName(name = name, modifier = Modifier.weight(1f))
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NodeName(name = name, modifier = Modifier.weight(1f, fill = false))
+            if (current) {
+                // Inline, after the name and before the numbers: the label is
+                // about this row, not about the card, and a row-level mark is
+                // what makes the two cards' rows read as different things.
+                Spacer(modifier = Modifier.width(StarveilSpacing.sm))
+                Text(
+                    text = stringResource(R.string.dashboard_current),
+                    style = StarveilType.label.copy(fontSize = 11.sp, lineHeight = 14.sp),
+                    color = StarveilColors.accent,
+                    maxLines = 1,
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(StarveilSpacing.md))
         Text(
             text = healthLine(health),
@@ -1010,17 +1040,24 @@ private fun RecentNodeRow(
     }
 }
 
+/**
+ * The row's right-hand reading: the latency, and nothing else.
+ *
+ * It used to append the windowed availability ("407 ms · online 100%"). That
+ * number is either 100% — which says nothing — or wrong in the one case that
+ * matters: a node the tunnel is carrying traffic through can read low because
+ * the background probe dials it directly, not through the tunnel. With no
+ * definition on screen it read as "this node is 77% online", which is not what
+ * it measures. The availability still ranks nodes for automatic selection and
+ * is still drawn, with its window and its curve, on the health card.
+ */
 @Composable
 private fun healthLine(health: NodeHealth?): String {
     val ema = health?.emaMs
     return if (ema == null) {
         stringResource(R.string.dashboard_recent_untested)
     } else {
-        stringResource(
-            R.string.dashboard_recent_health,
-            ema,
-            health.availabilityPct.roundToInt(),
-        )
+        stringResource(R.string.dashboard_recent_health, ema)
     }
 }
 

@@ -1,5 +1,7 @@
 package com.justnpcx.starveil.core.data.geo
 
+import java.net.InetAddress
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,6 +20,20 @@ import kotlinx.coroutines.withContext
  * failure is cached for [FAILURE_RETRY_MS] and then retried: the phone that ran
  * its first lookup offline should not be stuck with unlabelled nodes until the
  * process dies.
+ *
+ * A private address is not a failure. A node on the LAN — 192.168.1.10, or a
+ * home server's name that resolves into the same subnet — is in the room the
+ * phone is in, and GeoIP has nothing to say about it by design. Those get the
+ * device's own region instead of no answer at all; see [localCountryOf].
+ *
+ * The caller persists whatever this returns, and the country is then frozen:
+ * the field is treated as a GeoIP fact by the country filter, the region
+ * grouping and the filter sheet's country list. For a LAN node that fact is
+ * really the device's region setting — the honest label for a machine in the
+ * same room, but not a lookup result. The alternative (a result type that
+ * separates "looked up" from "derived", with only the former persisted) would
+ * mean changing the resolver's contract and the view model's write path; this
+ * keeps one function and one field, and the trade is written down here.
  */
 @Singleton
 class NodeCountryResolver(
@@ -73,16 +89,47 @@ class NodeCountryResolver(
                 return@withContext null
             }
             val country = lookupCountry(address)
-            if (country == null) {
-                failedAt[host] = nowMs()
-                return@withContext null
+            if (country != null) {
+                resolved[host] = country
+                failedAt.remove(host)
+                return@withContext country
             }
-            resolved[host] = country
-            failedAt.remove(host)
-            country
+            // GeoIP has no entry for a private address. That is not a failed
+            // lookup, and the honest label for a node on this network is the
+            // region this device is set to — not the United Nations flag.
+            val local = localCountryOf(address)
+            if (local != null) {
+                resolved[host] = local
+                failedAt.remove(host)
+                return@withContext local
+            }
+            failedAt[host] = nowMs()
+            null
         } finally {
             inFlight.remove(host)
         }
+    }
+
+    /**
+     * The device's own country, for an address that is not a public one.
+     *
+     * Only private, loopback and link-local addresses qualify: a public address
+     * the database happens not to know is still unknown, and must not be
+     * labelled with the phone's region.
+     *
+     * The value is the system's region setting, not a location — the phone
+     * knows the country it was set up for, not where it is. That is why this
+     * is a fallback for the one case where "no country" is clearly wrong (the
+     * node is on this network) and not a general answer.
+     */
+    private fun localCountryOf(address: String): String? {
+        // The argument is a resolved address, so this is a parse, not a DNS
+        // query — and a malformed one simply has no local country.
+        val ip = runCatching { InetAddress.getByName(address) }.getOrNull() ?: return null
+        val local = ip.isSiteLocalAddress || ip.isLoopbackAddress || ip.isLinkLocalAddress
+        if (!local) return null
+        return Locale.getDefault().country
+            ?.takeIf { code -> code.length == 2 && code.all { it in 'A'..'Z' } }
     }
 
     private companion object {

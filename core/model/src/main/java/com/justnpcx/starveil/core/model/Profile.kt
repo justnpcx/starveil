@@ -16,9 +16,14 @@ data class Profile(
     /** Belongs to this group (by group id). */
     val groupId: Long = 0L,
     /**
-     * ISO-3166 alpha-2 of the node's address, resolved once from the GeoIP
-     * database. Null until resolved, or when the address could not be looked
-     * up — the node still works, it just has no flag.
+     * ISO-3166 alpha-2 of the node's address, resolved once and then frozen.
+     *
+     * Normally a GeoIP answer. For an address on the local network — which the
+     * database cannot place by design — the resolver stores the device's own
+     * region instead, because a node in the same room is in the same country
+     * as the phone. Null until resolved, or when the address could not be
+     * looked up and is not a local one — the node still works, it just has no
+     * flag.
      */
     val country: String? = null,
     /**

@@ -49,6 +49,8 @@ object StarveilColors {
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.bg
     val card: Color
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.card
+    val sessionCard: Color
+        @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.sessionCard
     val ink: Color
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.ink
     val ink2: Color
@@ -71,6 +73,8 @@ object StarveilColors {
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.ok
     val warn: Color
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.warn
+    val standby: Color
+        @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.standby
     val ringOff: Color
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.ringOff
     val accentSoft: Color
