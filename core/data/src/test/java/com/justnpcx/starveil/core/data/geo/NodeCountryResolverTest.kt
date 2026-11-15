@@ -61,7 +61,11 @@ class NodeCountryResolverTest {
     }
 
     @Test
-    fun `an address with no country is treated as a failure`() = runBlocking {
+    fun `a host with no answer at all is cooled down and retried`() = runBlocking {
+        // A null country is no longer a failure on its own: it falls back to
+        // the device's region. The failure path is what is left when the
+        // device has no region to give either.
+        Locale.setDefault(Locale.forLanguageTag("zh"))
         address = "203.0.113.9"
         country = null
 
@@ -100,11 +104,31 @@ class NodeCountryResolverTest {
     }
 
     @Test
-    fun `a private address takes the device's country`() = runBlocking {
-        // GeoIP has nothing to say about 192.168/16 by design. A node there is
-        // on this network, so the phone's own region is the honest answer —
-        // and the United Nations flag would be a lie about a machine in the
-        // next room.
+    fun `an address the database cannot place takes the device's country`() = runBlocking {
+        // TEST-NET-3 has no geo entry. Rather than no flag at all, the node
+        // takes the device's region — a guess, and the one this app makes.
+        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
+        address = "203.0.113.9"
+        country = null
+
+        assertEquals("CN", resolver.countryOf("unplaced.example"))
+    }
+
+    @Test
+    fun `an IPv6 address takes it too`() = runBlocking {
+        // The database is IPv4-only, so every IPv6 node lands here. This is the
+        // real address a Cloudflare Tunnel home node resolves to.
+        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
+        address = "2408:8256:2284:127:56d1:96ff:fed5:d317"
+        country = null
+
+        assertEquals("CN", resolver.countryOf("home.example"))
+    }
+
+    @Test
+    fun `a private address takes it as well`() = runBlocking {
+        // The original case: a node on the LAN, which GeoIP cannot place by
+        // design.
         Locale.setDefault(Locale.forLanguageTag("zh-CN"))
         address = "192.168.1.10"
         country = null
@@ -113,95 +137,35 @@ class NodeCountryResolverTest {
     }
 
     @Test
-    fun `loopback and link-local addresses take it too`() = runBlocking {
+    fun `a GeoIP answer wins over the device`() = runBlocking {
+        // The lookup is still first: a node that can be placed is placed by the
+        // database, not by the phone's region.
         Locale.setDefault(Locale.forLanguageTag("zh-CN"))
-        country = null
+        address = "8.8.8.8"
+        country = "US"
 
-        address = "127.0.0.1"
-        assertEquals("CN", resolver.countryOf("loopback.example"))
-        address = "169.254.1.1"
-        assertEquals("CN", resolver.countryOf("link-local.example"))
+        assertEquals("US", resolver.countryOf("public.example"))
     }
 
     @Test
-    fun `a public address the database does not know stays unknown`() = runBlocking {
-        // TEST-NET-3 is public address space with no geo entry. Falling back to
-        // the phone's region here would put a foreign node in the user's own
-        // country.
-        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
-        address = "203.0.113.9"
-        country = null
-
-        assertNull(resolver.countryOf("unknown.example"))
-    }
-
-    @Test
-    fun `a locale without a country has no answer to give`() = runBlocking {
+    fun `a locale without a country leaves the node unplaced`() = runBlocking {
+        // No region to guess with: the node keeps no flag rather than getting a
+        // placeholder one.
         Locale.setDefault(Locale.forLanguageTag("zh"))
-        address = "192.168.1.10"
+        address = "203.0.113.9"
         country = null
 
         assertNull(resolver.countryOf("language-only.example"))
     }
 
     @Test
-    fun `a three-letter country is not a country code`() = runBlocking {
+    fun `a three-letter region is not a country code`() = runBlocking {
         // A malformed region must not be written into the profile: the field is
         // an ISO alpha-2 code and the flag is built from it.
         Locale.setDefault(Locale("zh", "CHN"))
-        address = "192.168.1.10"
+        address = "203.0.113.9"
         country = null
 
         assertNull(resolver.countryOf("bad-region.example"))
-    }
-
-    @Test
-    fun `a benchmarking address takes the device's country`() = runBlocking {
-        // 198.18.0.0/15 (RFC 2544). A Cloudflare Tunnel's token IP lives here,
-        // and so does a proxy's fake-IP placeholder — neither has a country,
-        // and the node behind it is a tunnel or a private build.
-        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
-        address = "198.18.34.190"
-        country = null
-
-        assertEquals("CN", resolver.countryOf("tunnel.example"))
-    }
-
-    @Test
-    fun `a shared address takes it too`() = runBlocking {
-        // 100.64.0.0/10 (RFC 6598): carrier-grade NAT, and the older token IP
-        // range of the same tunnels.
-        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
-        address = "100.80.0.5"
-        country = null
-
-        assertEquals("CN", resolver.countryOf("cgn.example"))
-    }
-
-    @Test
-    fun `the ranges end where they end`() = runBlocking {
-        // One address outside each edge, so the masks cannot quietly widen.
-        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
-        country = null
-
-        address = "100.63.255.255"
-        assertNull(resolver.countryOf("below-cgn.example"))
-        address = "100.128.0.1"
-        assertNull(resolver.countryOf("above-cgn.example"))
-        address = "198.17.255.255"
-        assertNull(resolver.countryOf("below-bench.example"))
-        address = "198.20.0.1"
-        assertNull(resolver.countryOf("above-bench.example"))
-    }
-
-    @Test
-    fun `a public address with a GeoIP answer keeps it`() = runBlocking {
-        // The lookup wins: the device's region is only ever a fallback for an
-        // address the database cannot place.
-        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
-        address = "8.8.8.8"
-        country = "US"
-
-        assertEquals("US", resolver.countryOf("public.example"))
     }
 }

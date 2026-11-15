@@ -1,6 +1,5 @@
 package com.justnpcx.starveil.core.data.geo
 
-import java.net.InetAddress
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -21,19 +20,23 @@ import kotlinx.coroutines.withContext
  * its first lookup offline should not be stuck with unlabelled nodes until the
  * process dies.
  *
- * A private address is not a failure. A node on the LAN — 192.168.1.10, or a
- * home server's name that resolves into the same subnet — is in the room the
- * phone is in, and GeoIP has nothing to say about it by design. Those get the
- * device's own region instead of no answer at all; see [localCountryOf].
+ * An address the database cannot place is not a failure either. The database
+ * is IPv4-only, so every IPv6 node lands here; so does the occasional IPv4
+ * address outside its table. Those get the device's own region — a best guess,
+ * not a lookup: a node that cannot be placed is most likely a private build in
+ * the phone's country, and the alternative was a flag that says nothing.
  *
  * The caller persists whatever this returns, and the country is then frozen:
  * the field is treated as a GeoIP fact by the country filter, the region
- * grouping and the filter sheet's country list. For a LAN node that fact is
- * really the device's region setting — the honest label for a machine in the
- * same room, but not a lookup result. The alternative (a result type that
- * separates "looked up" from "derived", with only the former persisted) would
- * mean changing the resolver's contract and the view model's write path; this
- * keeps one function and one field, and the trade is written down here.
+ * grouping and the filter sheet's country list. For a guessed node that fact
+ * is really the device's region setting, and a foreign node the database could
+ * not place will be labelled with it. That is a deliberate product trade —
+ * "every node has a country" over "only label what was looked up" — and the
+ * proper fix is an IPv6 GeoIP table, which is a separate piece of work. The
+ * alternative (a result type that separates "looked up" from "derived", with
+ * only the former persisted) would mean changing the resolver's contract and
+ * the view model's write path; this keeps one function and one field, and the
+ * trade is written down here.
  */
 @Singleton
 class NodeCountryResolver(
@@ -94,14 +97,14 @@ class NodeCountryResolver(
                 failedAt.remove(host)
                 return@withContext country
             }
-            // GeoIP has no entry for an address that cannot be routed. That is
-            // not a failed lookup, and the honest label for such a node is the
-            // region this device is set to — not the United Nations flag.
-            val local = nonRoutableCountryOf(address)
-            if (local != null) {
-                resolved[host] = local
+            // No GeoIP answer. Rather than no flag at all, take the device's
+            // region: this is the one case where "somewhere" beats "nowhere",
+            // and it is a guess, not a lookup.
+            val device = deviceCountry()
+            if (device != null) {
+                resolved[host] = device
                 failedAt.remove(host)
-                return@withContext local
+                return@withContext device
             }
             failedAt[host] = nowMs()
             null
@@ -111,57 +114,16 @@ class NodeCountryResolver(
     }
 
     /**
-     * The device's own country, for an address no public route can reach.
-     *
-     * The covered ranges:
-     *  - private, loopback and link-local — RFC 1918, 127/8, 169.254/16, IPv6
-     *    ULA, fe80::/10 and ::1 (the JDK's own predicates);
-     *  - 100.64.0.0/10 — RFC 6598 shared address space, the range carrier-grade
-     *    NAT and Cloudflare Tunnel's older token IPs live in;
-     *  - 198.18.0.0/15 — RFC 2544 benchmarking, which proxies also use as the
-     *    placeholder answer in fake-IP mode, and which Cloudflare Tunnel's
-     *    default token IP comes from.
-     *
-     * A proxy node whose name resolves into one of these is either a tunnel or
-     * a private build: a commercial node has to have a real public address to
-     * be reachable at all. A private build is most likely in the same country
-     * as the phone, so the device's region is the best guess available — the
-     * same inference as the private-address case, with the range completed.
+     * The device's own region, or null when the system has none to give.
      *
      * The value is the system's region setting, not a location: the phone knows
-     * the country it was set up for, not where it is. A public address the
-     * database does not know is still unknown and must not be labelled this
-     * way, which is why the check is on the address and not on the lookup.
+     * the country it was set up for, not where it is. A language-only locale,
+     * or a region that is not an ISO alpha-2 code, has no answer — and the
+     * caller then leaves the node without a flag rather than inventing one.
      */
-    private fun nonRoutableCountryOf(address: String): String? {
-        // The argument is a resolved address, so this is a parse, not a DNS
-        // query — and a malformed one simply has no local country.
-        val ip = runCatching { InetAddress.getByName(address) }.getOrNull() ?: return null
-        if (!ip.isNonRoutable()) return null
-        return Locale.getDefault().country
+    private fun deviceCountry(): String? =
+        Locale.getDefault().country
             ?.takeIf { code -> code.length == 2 && code.all { it in 'A'..'Z' } }
-    }
-
-    /**
-     * True when no public route can reach this address.
-     *
-     * IPv6 needs nothing beyond the JDK's three predicates: ULA, link-local and
-     * loopback are all of the non-routable v6 an app will meet here. The two
-     * extra ranges are IPv4-only and are read from the four bytes rather than
-     * from string prefixes, so `100.64.0.1` cannot be confused with a hostname
-     * that starts the same way.
-     */
-    private fun InetAddress.isNonRoutable(): Boolean {
-        if (isSiteLocalAddress || isLoopbackAddress || isLinkLocalAddress) return true
-        val bytes = address
-        if (bytes.size != 4) return false
-        val first = bytes[0].toInt() and 0xFF
-        val second = bytes[1].toInt() and 0xFF
-        // RFC 6598, shared address space: 100.64.0.0/10.
-        if (first == 100 && second in 64..127) return true
-        // RFC 2544, benchmarking: 198.18.0.0/15.
-        return first == 198 && second in 18..19
-    }
 
     private companion object {
         /** How long a failed lookup keeps a host out of the queue. */

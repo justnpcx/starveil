@@ -23,31 +23,20 @@ object CountryFlags {
 
     private const val REGIONAL_INDICATOR_A = 0x1F1E6
 
-    /**
-     * The mark for a node whose country is unknown: the United Nations flag.
-     *
-     * A flag rather than nothing, and a flag rather than a globe: every row then
-     * begins with a region mark of the same shape and size as the real ones.
-     * The globe was tried and rejected — a small standard circle beside
-     * rectangular flags reads as a different kind of object, and a placeholder
-     * tile read as a broken camera. `UN` is the regional-indicator pair
-     * U+1F1FA U+1F1F3, the same mechanism as every country flag, and its
-     * meaning — international, all countries — is exactly "we could not place
-     * this one".
-     */
-    const val UNKNOWN = "🇺🇳"
 }
 
 /**
- * The name as the UI shows it: `🇺🇸 HY2+Reality`, or `🇺🇳 npc-home` when the
+ * The name as the UI shows it: `🇺🇸 HY2+Reality`, or the bare name when the
  * country could not be resolved. The stored name never changes — the mark is a
  * rendering detail, so exports and backups stay exactly what the provider
  * wrote.
  *
- * The United Nations flag is a deliberate fallback, not an error state: a node
- * whose address is private or otherwise not in the GeoIP database still works,
- * and a region mark on every row keeps the names starting at the same place,
- * in the same shape, at the same size.
+ * No country means no mark. There is no placeholder flag: a row that has not
+ * been placed starts with the name, and every row that does have a country
+ * starts with it. The resolver's job is to place a node — the device's region
+ * stands in when the database cannot — so a bare name is the rare case where
+ * even that was unavailable, and a flag there would be a guess dressed up as
+ * a fact.
  */
 fun Profile.displayName(): String =
-    "${CountryFlags.flag(country) ?: CountryFlags.UNKNOWN} $name"
+    CountryFlags.flag(country)?.let { "$it $name" } ?: name

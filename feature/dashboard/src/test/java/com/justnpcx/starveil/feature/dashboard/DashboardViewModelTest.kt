@@ -968,11 +968,8 @@ class DashboardViewModelTest {
         override val failure: StateFlow<RulePackFailure?> = MutableStateFlow(null)
     }
 
-    /**
-     * A node name as the UI shows it. These fixtures have no country, so the
-     * name carries the globe every unresolvable node gets.
-     */
-    private fun nodeName(name: String) = "${CountryFlags.UNKNOWN} $name"
+    /** A node name as the UI shows it. These fixtures have no country, so no mark. */
+    private fun nodeName(name: String) = name
 
     private fun profile(id: Long, name: String, country: String? = null) = Profile(
         id = id,
