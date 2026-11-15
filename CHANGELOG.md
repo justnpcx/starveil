@@ -8,6 +8,18 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.37] — 2026-11-15
+
+### Changed
+
+- **The day standby ring is one step deeper.** Amber at #D97706 measured
+  2.79:1 against the page, under the 3:1 bar a state indicator has to clear;
+  #C46A04 gives 3.40:1 on the page and 3.88:1 on a card. The colour still reads
+  as standby — not the connected green, not the blocked red, not the brand
+  gradient — and the night value (10.14:1) is unchanged. The pair is now
+  asserted in `ContrastTest`, so a future edit fails in CI instead of on a
+  screen.
+
 ## [0.9.36] — 2026-11-15
 
 ### Changed
