@@ -32,6 +32,16 @@ data class StarveilPalette(
     val bg: Color,
     /** A card, a dialog, a menu, a sheet. Opaque by design. */
     val card: Color,
+    /**
+     * The session card's face: the connection card, and only it.
+     *
+     * A structural tint, not a state: the card that holds the tunnel reads as
+     * a different object from the list of past nodes below it, in both states.
+     * A wash of the brand blue in the day, a blue-leaning dark surface at
+     * night — never the accent preset's colour, because the card's identity
+     * does not change when the user changes the accent.
+     */
+    val sessionCard: Color,
     /** Primary text. */
     val ink: Color,
     /** Secondary text, icons, labels. */
@@ -157,6 +167,7 @@ val LightPalette = StarveilPalette(
     dark = false,
     bg = Color(0xFFEDF0F4),
     card = Color(0xFFFFFFFF),
+    sessionCard = Color(0xFFEAF1FE),
     ink = Color(0xFF1F1F1F),
     ink2 = Color(0xFF444746),
     line = Color(0xFFDCE1E8),
@@ -194,6 +205,7 @@ val DarkPalette = StarveilPalette(
     dark = true,
     bg = Color(0xFF131314),
     card = Color(0xFF1E1F20),
+    sessionCard = Color(0xFF242E3D),
     ink = Color(0xFFE3E3E3),
     ink2 = Color(0xFFC4C7C5),
     line = Color(0xFF3F4446),

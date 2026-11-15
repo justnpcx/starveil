@@ -76,4 +76,5 @@
     <string name="dashboard_exit_last_empty">暫無上次會話</string>
     <string name="dashboard_exit_last_today_value">今天 %1$s</string>
     <string name="dashboard_exit_last_date_value">%1$s</string>
+    <string name="dashboard_current">目前</string>
 </resources>

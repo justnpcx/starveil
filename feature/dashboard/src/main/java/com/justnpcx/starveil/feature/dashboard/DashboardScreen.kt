@@ -859,11 +859,16 @@ private fun ConnectionCard(
 ) {
     val connected = state.connectionState == ConnectionState.CONNECTED ||
         state.connectionState == ConnectionState.WARNING
-    StarveilCard(modifier = Modifier.fillMaxWidth()) {
+    // The session card is tinted: the same rows in two white cards left the
+    // reader to work out which one is live from position alone, and the first
+    // thing this card holds is the node in force. The tint is structural — it
+    // does not change with the connection's state.
+    StarveilCard(modifier = Modifier.fillMaxWidth(), face = StarveilColors.sessionCard) {
         CardZone(onClick = onOpenNodes) {
             NodeZone(
                 name = state.selectedNodeName ?: stringResource(R.string.dashboard_no_node),
                 health = state.health,
+                current = state.selectedNodeName != null,
                 padding = padding,
                 rowPadding = rowPadding,
             )
@@ -931,14 +936,38 @@ private fun CardZone(
  * and the numbers never wrap, so a long node name cannot push them off.
  */
 @Composable
-private fun NodeZone(name: String, health: NodeHealth?, padding: Dp, rowPadding: Dp) {
+private fun NodeZone(
+    name: String,
+    health: NodeHealth?,
+    /** True when this card's node is a node: the row then says "current". */
+    current: Boolean,
+    padding: Dp,
+    rowPadding: Dp,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = padding, vertical = rowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NodeName(name = name, modifier = Modifier.weight(1f))
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NodeName(name = name, modifier = Modifier.weight(1f, fill = false))
+            if (current) {
+                // Inline, after the name and before the numbers: the label is
+                // about this row, not about the card, and a row-level mark is
+                // what makes the two cards' rows read as different things.
+                Spacer(modifier = Modifier.width(StarveilSpacing.sm))
+                Text(
+                    text = stringResource(R.string.dashboard_current),
+                    style = StarveilType.label.copy(fontSize = 11.sp, lineHeight = 14.sp),
+                    color = StarveilColors.accent,
+                    maxLines = 1,
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(StarveilSpacing.md))
         Text(
             text = healthLine(health),
