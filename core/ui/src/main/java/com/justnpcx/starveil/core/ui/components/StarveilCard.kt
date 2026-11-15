@@ -36,12 +36,13 @@ import com.justnpcx.starveil.core.ui.theme.StarveilShapes
 import com.justnpcx.starveil.core.ui.theme.StarveilSpacing
 
 /**
- * A glass card: the app's only grouping device.
+ * A card: the app's only grouping device.
  *
- * 68% white over the page's ambient gradient, a 1dp white edge, 22dp corners,
- * and the demo's own whisper of a shadow (7%, 4dp, 18dp blur) so the material
- * reads as lifted rather than drawn on. The edge is the highlight that makes
- * it glass; the shadow only separates it from the page.
+ * An opaque face — the palette's card colour, the same one every card on every
+ * page uses — a 1dp edge, 22dp corners, and a shadow so the surface reads as
+ * lifted rather than drawn on. The edge and the shadow only separate it from
+ * the page; the face carries no tint of its own, so two cards side by side are
+ * two instances of one material rather than two kinds of card.
  *
  * Cards do not nest. A card inside a card is two edges for one grouping, and
  * the inner one always looks like a mistake.

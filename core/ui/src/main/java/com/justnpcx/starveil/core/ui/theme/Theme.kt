@@ -99,8 +99,6 @@ object StarveilColors {
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.hubAboutBed
     val hubAboutInk: Color
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.hubAboutInk
-    val veil: Color
-        @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.veil
     val washes: List<Color>
         @Composable @ReadOnlyComposable get() = LocalStarveilPalette.current.washes
     val shadowTint: Color

@@ -18,12 +18,12 @@ data class Profile(
     /**
      * ISO-3166 alpha-2 of the node's address, resolved once and then frozen.
      *
-     * Normally a GeoIP answer. For an address no public route can reach — a
-     * private one, a carrier-grade NAT range, a proxy's fake-IP placeholder —
-     * the resolver stores the device's own region instead, because such a node
-     * is a tunnel or a private build and is most likely in the same country as
-     * the phone. Null until resolved, or when the address could not be looked
-     * up and is routable — the node still works, it just has no flag.
+     * Normally a GeoIP answer. Any address the database cannot place takes the
+     * device's own region instead — a best guess, not a lookup: the database is
+     * IPv4-only, so every IPv6 node lands there, and the rest are private,
+     * tunnelled or simply absent from its table. Null only when the address
+     * could not be resolved at all, or the device has no region to give; the
+     * node still works, it just has no flag.
      */
     val country: String? = null,
     /**

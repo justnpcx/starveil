@@ -44,7 +44,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalContext
@@ -726,8 +725,13 @@ private fun healthClause(latencyMs: Long?): String =
  *
  * The unit sits on the number's baseline, not above it.
  *
- * Dimmed as a whole when there is no tunnel: three zeros say "no traffic", a
- * third of the ink says "nothing is connected", and the second is the truth.
+ * With no tunnel the numbers drop one step to secondary ink, and only the
+ * numbers: the labels and totals are already secondary. Fading the whole block
+ * instead was the one place in the app that used opacity to say a state, and at
+ * 38% it made the reading lighter than the exit card's own fade that was
+ * already judged unreadable on device. A colour step is legible and is the same
+ * move the exit rows make when they show the last session instead of a live
+ * one — so "not live" still reads, and it reads the same way in both places.
  */
 @Composable
 private fun SpeedSection(state: DashboardUiState, modifier: Modifier = Modifier) {
@@ -735,21 +739,21 @@ private fun SpeedSection(state: DashboardUiState, modifier: Modifier = Modifier)
     val down = formatRateParts(state.stats.downlinkRate)
     val up = formatRateParts(state.stats.uplinkRate)
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .alpha(if (dim) 0.38f else 1f),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
     ) {
         SpeedColumn(
             label = stringResource(R.string.dashboard_speed_down),
             parts = down,
             total = state.stats.downlinkBytes,
+            dim = dim,
             modifier = Modifier.weight(1f),
         )
         SpeedColumn(
             label = stringResource(R.string.dashboard_speed_up),
             parts = up,
             total = state.stats.uplinkBytes,
+            dim = dim,
             modifier = Modifier.weight(1f),
         )
     }
@@ -760,6 +764,8 @@ private fun SpeedColumn(
     label: String,
     parts: RateParts,
     total: Long,
+    /** No tunnel: the number is secondary, the rest is already secondary. */
+    dim: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -781,7 +787,7 @@ private fun SpeedColumn(
                 // Tabular figures: a rate that ticks every second must not
                 // change width, or the whole row twitches with it.
                 style = StarveilType.display.copy(fontFeatureSettings = "tnum"),
-                color = StarveilColors.ink,
+                color = if (dim) StarveilColors.ink2 else StarveilColors.ink,
                 // One line, always. A rate that wraps is no longer a rate.
                 softWrap = false,
                 maxLines = 1,
