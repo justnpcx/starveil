@@ -860,11 +860,12 @@ private fun ConnectionCard(
 ) {
     val connected = state.connectionState == ConnectionState.CONNECTED ||
         state.connectionState == ConnectionState.WARNING
-    // The session card is tinted: the same rows in two white cards left the
-    // reader to work out which one is live from position alone, and the first
-    // thing this card holds is the node in force. The tint is structural — it
-    // does not change with the connection's state.
-    StarveilCard(modifier = Modifier.fillMaxWidth(), face = StarveilColors.sessionCard) {
+    // The card face is the page's one card colour. It used to be tinted to
+    // tell it from the recent card, but a second surface colour on one page
+    // reads as two kinds of card rather than one live one; the "current" label
+    // on the row, the exit rows below it and its position already say which is
+    // which.
+    StarveilCard(modifier = Modifier.fillMaxWidth()) {
         CardZone(onClick = onOpenNodes) {
             NodeZone(
                 name = state.selectedNodeName ?: stringResource(R.string.dashboard_no_node),
