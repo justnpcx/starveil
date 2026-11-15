@@ -62,6 +62,12 @@ data class StarveilPalette(
      * as switched off or unavailable, and this is the control's resting state,
      * ready for a tap. Deliberately not [warn]: warning is a fault, and its
      * hue is a different, darker amber in the day and a peach at night.
+     *
+     * The day value is one step deeper than the amber it was drawn with at
+     * first (#D97706), because that one measured 2.79:1 against the page — a
+     * ring is a graphic, and the bar is 3:1. At #C46A04 it is 3.40:1 on the
+     * page and 3.88:1 on a card, and the night value was never close to the
+     * line.
      */
     val standby: Color,
     /** The ring when nothing is connected. */
@@ -166,7 +172,7 @@ val LightPalette = StarveilPalette(
     err = Color(0xFFB3261E),
     ok = Color(0xFF137333),
     warn = Color(0xFFAC4D00),
-    standby = Color(0xFFD97706),
+    standby = Color(0xFFC46A04),
     ringOff = Color(0xFFC4C7C5),
     accentSoft = Color(0xFFE8F0FE),
     floatDisc = Color(0xFFFFFFFF),

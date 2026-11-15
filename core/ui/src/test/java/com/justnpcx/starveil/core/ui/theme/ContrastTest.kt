@@ -56,6 +56,12 @@ class ContrastTest {
         for ((name, p) in palettes) {
             assertAtLeast(3.0, p.accent, p.bg, name + ": accent mark on bg")
             assertAtLeast(3.0, p.err, p.bg, name + ": err dot on bg")
+            // The standby ring is the largest mark the app draws and the one
+            // the eye lands on first: a 204dp ring on the page, with the star
+            // inside it in the same colour. It is a state, not decoration, so
+            // it is held to the graphic bar on both surfaces it can sit on.
+            assertAtLeast(3.0, p.standby, p.bg, name + ": standby ring on bg")
+            assertAtLeast(3.0, p.standby, p.card, name + ": standby ring on card")
         }
     }
 
@@ -98,6 +104,8 @@ class ContrastTest {
                 "accent on bg" to (p.accent to p.bg),
                 "selInk on selBg" to (p.selInk to p.selBg),
                 "err on card" to (p.err to p.card),
+                "standby on bg" to (p.standby to p.bg),
+                "standby on card" to (p.standby to p.card),
                 "warn on bg" to (p.warn to p.bg),
                 "warn on card" to (p.warn to p.card),
                 "hub scenes glyph on bed" to (p.hubScenes.ink to p.hubScenes.bg),
