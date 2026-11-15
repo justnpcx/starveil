@@ -118,14 +118,21 @@ class ContrastTest {
     }
 
     /**
-     * Every accent preset, in both modes.
+     * Every accent preset, in both modes, on every surface it is drawn on.
      *
      * A preset that cannot carry text on the page is a preset that has to be
      * adjusted, not shipped — the whole point of a short measured list is that
-     * all five are usable.
+     * all five are usable. This is the guard for that: change a value in the
+     * preset table and the failure names the preset, the mode and the surface.
+     *
+     * Text is held to 4.5:1. The two tinted surfaces below carry the accent as
+     * a mark rather than as running text — the icon inside a selected chip, the
+     * funnel at the end of the search field — so they are held to the graphic
+     * bar, 3:1. PINE's light accent is the tightest pair at 4.42:1 on the
+     * selected fill, which is why it is a mark and not a label.
      */
     @Test
-    fun everyAccentPresetClearsTheTextThreshold() {
+    fun everyAccentPresetClearsItsThresholds() {
         // TEAL is retired and no longer in the table; its stored value falls
         // back to STAR_BLUE, which the loop already covers.
         for (preset in com.justnpcx.starveil.core.model.AccentPreset.entries.filter {
@@ -137,6 +144,8 @@ class ContrastTest {
                 assertAtLeast(4.5, p.accent, p.bg, where + ": accent on bg")
                 assertAtLeast(4.5, p.accent, p.card, where + ": accent on card")
                 assertAtLeast(4.5, p.selInk, p.selBg, where + ": selInk on selBg")
+                assertAtLeast(3.0, p.accent, p.selBg, where + ": accent mark on selBg")
+                assertAtLeast(3.0, p.accent, p.segBg, where + ": accent mark on segBg")
             }
         }
     }
@@ -152,6 +161,8 @@ class ContrastTest {
                 println(where + "_accent_on_bg=" + "%.2f".format(contrast(p.accent, p.bg)))
                 println(where + "_accent_on_card=" + "%.2f".format(contrast(p.accent, p.card)))
                 println(where + "_selInk_on_selBg=" + "%.2f".format(contrast(p.selInk, p.selBg)))
+                println(where + "_accent_on_selBg=" + "%.2f".format(contrast(p.accent, p.selBg)))
+                println(where + "_accent_on_segBg=" + "%.2f".format(contrast(p.accent, p.segBg)))
             }
         }
     }
