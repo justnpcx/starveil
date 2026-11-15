@@ -693,10 +693,10 @@ private fun DashboardNotice.text(): String = when (this) {
  */
 @Composable
 private fun RecommendationReason.text(): String = when (this) {
-    is RecommendationReason.Healthiest -> healthClause(availabilityPct, latencyMs)
+    is RecommendationReason.Healthiest -> healthClause(latencyMs)
     is RecommendationReason.TiedOnScore -> region
-        ?.let { stringResource(R.string.dashboard_reason_tied_region, healthClause(availabilityPct, latencyMs), it.displayName) }
-        ?: stringResource(R.string.dashboard_reason_tied, healthClause(availabilityPct, latencyMs))
+        ?.let { stringResource(R.string.dashboard_reason_tied_region, healthClause(latencyMs), it.displayName) }
+        ?: stringResource(R.string.dashboard_reason_tied, healthClause(latencyMs))
     is RecommendationReason.AllCoolingDown ->
         stringResource(R.string.dashboard_reason_cooling_down, minutesLeft)
     RecommendationReason.NothingMeasured ->
@@ -707,13 +707,14 @@ private fun RecommendationReason.text(): String = when (this) {
  * What the picker saw, in the units the user measures in.
  *
  * The score is a 0–10099 internal number. It is deliberately not shown:
- * "score 10099" is precise about the wrong thing, and the two numbers it is
- * made of are the ones a person can check against the health chart above.
+ * "score 10099" is precise about the wrong thing. The availability half of it
+ * is not shown either — the row it explains no longer carries a percentage, and
+ * a reason that quotes one would be the last place the number still appeared.
  */
 @Composable
-private fun healthClause(availabilityPct: Int, latencyMs: Long?): String =
-    latencyMs?.let { stringResource(R.string.dashboard_reason_health, availabilityPct, it) }
-        ?: stringResource(R.string.dashboard_reason_health_no_latency, availabilityPct)
+private fun healthClause(latencyMs: Long?): String =
+    latencyMs?.let { stringResource(R.string.dashboard_reason_health, it) }
+        ?: stringResource(R.string.dashboard_reason_health_no_latency)
 
 /**
  * The telemetry block: two columns, mirrored about the screen's centre.
@@ -1039,17 +1040,24 @@ private fun RecentNodeRow(
     }
 }
 
+/**
+ * The row's right-hand reading: the latency, and nothing else.
+ *
+ * It used to append the windowed availability ("407 ms · online 100%"). That
+ * number is either 100% — which says nothing — or wrong in the one case that
+ * matters: a node the tunnel is carrying traffic through can read low because
+ * the background probe dials it directly, not through the tunnel. With no
+ * definition on screen it read as "this node is 77% online", which is not what
+ * it measures. The availability still ranks nodes for automatic selection and
+ * is still drawn, with its window and its curve, on the health card.
+ */
 @Composable
 private fun healthLine(health: NodeHealth?): String {
     val ema = health?.emaMs
     return if (ema == null) {
         stringResource(R.string.dashboard_recent_untested)
     } else {
-        stringResource(
-            R.string.dashboard_recent_health,
-            ema,
-            health.availabilityPct.roundToInt(),
-        )
+        stringResource(R.string.dashboard_recent_health, ema)
     }
 }
 
