@@ -37,10 +37,20 @@ data class RuleMatcher(
     }
 }
 
-/** The matcher kinds sing-box still accepts. Labels live in the UI's strings. */
+/**
+ * The matcher kinds sing-box still accepts. Labels live in the UI's strings.
+ *
+ * The order is by how often a rule of that kind gets written, not by sing-box's
+ * field order: the editor lays these out in declaration order and pre-selects
+ * the first, and a suffix is what someone adding `example.com` almost always
+ * means — a bare value decodes to one too (see [RuleMatcher.decode]). The
+ * earlier order copied sing-box's `domain || domain_suffix || …` and left the
+ * editor defaulting to the second tile. Do not "fix" it back to the field
+ * order: nothing reads this by index, the wire names are the contract.
+ */
 enum class MatcherKind(val wireName: String) {
-    DOMAIN("domain"),
     DOMAIN_SUFFIX("domain_suffix"),
+    DOMAIN("domain"),
     DOMAIN_KEYWORD("domain_keyword"),
     IP_CIDR("ip_cidr"),
     ;
