@@ -97,7 +97,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SwipeToDismissBox
@@ -1591,8 +1590,6 @@ private fun NodeRow(
                     Modifier
                 },
             )
-            // The FAB floats over the list's bottom-right corner; the row keeps
-            // its number out from under it.
             .padding(
                 start = 10.dp,
                 top = 12.dp,
@@ -2360,8 +2357,6 @@ private val LATENCY_TOUCH_CORNER = 8.dp
  * "timeout" in the mono face, so neither the unit nor the word is ever clipped.
  */
 private val LATENCY_COLUMN_WIDTH = 76.dp
-
-/** The FAB's footprint (56dp) plus its margin from the screen edge (16dp). */
 
 @Composable
 private fun Hint(text: String) {
