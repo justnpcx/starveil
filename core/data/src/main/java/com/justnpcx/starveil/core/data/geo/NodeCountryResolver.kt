@@ -94,10 +94,10 @@ class NodeCountryResolver(
                 failedAt.remove(host)
                 return@withContext country
             }
-            // GeoIP has no entry for a private address. That is not a failed
-            // lookup, and the honest label for a node on this network is the
+            // GeoIP has no entry for an address that cannot be routed. That is
+            // not a failed lookup, and the honest label for such a node is the
             // region this device is set to — not the United Nations flag.
-            val local = localCountryOf(address)
+            val local = nonRoutableCountryOf(address)
             if (local != null) {
                 resolved[host] = local
                 failedAt.remove(host)
@@ -111,25 +111,56 @@ class NodeCountryResolver(
     }
 
     /**
-     * The device's own country, for an address that is not a public one.
+     * The device's own country, for an address no public route can reach.
      *
-     * Only private, loopback and link-local addresses qualify: a public address
-     * the database happens not to know is still unknown, and must not be
-     * labelled with the phone's region.
+     * The covered ranges:
+     *  - private, loopback and link-local — RFC 1918, 127/8, 169.254/16, IPv6
+     *    ULA, fe80::/10 and ::1 (the JDK's own predicates);
+     *  - 100.64.0.0/10 — RFC 6598 shared address space, the range carrier-grade
+     *    NAT and Cloudflare Tunnel's older token IPs live in;
+     *  - 198.18.0.0/15 — RFC 2544 benchmarking, which proxies also use as the
+     *    placeholder answer in fake-IP mode, and which Cloudflare Tunnel's
+     *    default token IP comes from.
      *
-     * The value is the system's region setting, not a location — the phone
-     * knows the country it was set up for, not where it is. That is why this
-     * is a fallback for the one case where "no country" is clearly wrong (the
-     * node is on this network) and not a general answer.
+     * A proxy node whose name resolves into one of these is either a tunnel or
+     * a private build: a commercial node has to have a real public address to
+     * be reachable at all. A private build is most likely in the same country
+     * as the phone, so the device's region is the best guess available — the
+     * same inference as the private-address case, with the range completed.
+     *
+     * The value is the system's region setting, not a location: the phone knows
+     * the country it was set up for, not where it is. A public address the
+     * database does not know is still unknown and must not be labelled this
+     * way, which is why the check is on the address and not on the lookup.
      */
-    private fun localCountryOf(address: String): String? {
+    private fun nonRoutableCountryOf(address: String): String? {
         // The argument is a resolved address, so this is a parse, not a DNS
         // query — and a malformed one simply has no local country.
         val ip = runCatching { InetAddress.getByName(address) }.getOrNull() ?: return null
-        val local = ip.isSiteLocalAddress || ip.isLoopbackAddress || ip.isLinkLocalAddress
-        if (!local) return null
+        if (!ip.isNonRoutable()) return null
         return Locale.getDefault().country
             ?.takeIf { code -> code.length == 2 && code.all { it in 'A'..'Z' } }
+    }
+
+    /**
+     * True when no public route can reach this address.
+     *
+     * IPv6 needs nothing beyond the JDK's three predicates: ULA, link-local and
+     * loopback are all of the non-routable v6 an app will meet here. The two
+     * extra ranges are IPv4-only and are read from the four bytes rather than
+     * from string prefixes, so `100.64.0.1` cannot be confused with a hostname
+     * that starts the same way.
+     */
+    private fun InetAddress.isNonRoutable(): Boolean {
+        if (isSiteLocalAddress || isLoopbackAddress || isLinkLocalAddress) return true
+        val bytes = address
+        if (bytes.size != 4) return false
+        val first = bytes[0].toInt() and 0xFF
+        val second = bytes[1].toInt() and 0xFF
+        // RFC 6598, shared address space: 100.64.0.0/10.
+        if (first == 100 && second in 64..127) return true
+        // RFC 2544, benchmarking: 198.18.0.0/15.
+        return first == 198 && second in 18..19
     }
 
     private companion object {

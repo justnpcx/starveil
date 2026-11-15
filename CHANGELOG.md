@@ -8,6 +8,19 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.34] — 2026-11-15
+
+### Changed
+
+- **A node behind a tunnel gets a flag.** The fallback for an address GeoIP
+  cannot place used to cover private addresses only, so a Cloudflare Tunnel
+  node resolving into 198.18/15 — a benchmarking range no public route
+  reaches — still showed the United Nations flag. Non-routable now means what
+  it says: private, loopback and link-local as before, plus carrier-grade NAT
+  (100.64/10) and the benchmarking / fake-IP range (198.18/15). Such a node is
+  a tunnel or a private build and is most likely in the phone's own country.
+  A public address the database does not know is still unlabelled.
+
 ## [0.9.33] — 2026-11-15
 
 ### Changed

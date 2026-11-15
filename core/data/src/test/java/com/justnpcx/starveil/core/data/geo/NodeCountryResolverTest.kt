@@ -154,4 +154,54 @@ class NodeCountryResolverTest {
 
         assertNull(resolver.countryOf("bad-region.example"))
     }
+
+    @Test
+    fun `a benchmarking address takes the device's country`() = runBlocking {
+        // 198.18.0.0/15 (RFC 2544). A Cloudflare Tunnel's token IP lives here,
+        // and so does a proxy's fake-IP placeholder — neither has a country,
+        // and the node behind it is a tunnel or a private build.
+        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
+        address = "198.18.34.190"
+        country = null
+
+        assertEquals("CN", resolver.countryOf("tunnel.example"))
+    }
+
+    @Test
+    fun `a shared address takes it too`() = runBlocking {
+        // 100.64.0.0/10 (RFC 6598): carrier-grade NAT, and the older token IP
+        // range of the same tunnels.
+        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
+        address = "100.80.0.5"
+        country = null
+
+        assertEquals("CN", resolver.countryOf("cgn.example"))
+    }
+
+    @Test
+    fun `the ranges end where they end`() = runBlocking {
+        // One address outside each edge, so the masks cannot quietly widen.
+        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
+        country = null
+
+        address = "100.63.255.255"
+        assertNull(resolver.countryOf("below-cgn.example"))
+        address = "100.128.0.1"
+        assertNull(resolver.countryOf("above-cgn.example"))
+        address = "198.17.255.255"
+        assertNull(resolver.countryOf("below-bench.example"))
+        address = "198.20.0.1"
+        assertNull(resolver.countryOf("above-bench.example"))
+    }
+
+    @Test
+    fun `a public address with a GeoIP answer keeps it`() = runBlocking {
+        // The lookup wins: the device's region is only ever a fallback for an
+        // address the database cannot place.
+        Locale.setDefault(Locale.forLanguageTag("zh-CN"))
+        address = "8.8.8.8"
+        country = "US"
+
+        assertEquals("US", resolver.countryOf("public.example"))
+    }
 }
