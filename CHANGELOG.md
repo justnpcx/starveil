@@ -8,6 +8,25 @@ Milestone N ships as `0.N.0`; `versionCode` is derived from it.
 
 ## [Unreleased]
 
+## [0.9.35] — 2026-11-15
+
+### Changed
+
+- **The United Nations flag is gone.** Any node the GeoIP database cannot place
+  now takes the device's own region, and a node with no country at all simply
+  has no flag. The database is IPv4-only, so this is what puts a flag on every
+  IPv6 node — including the home tunnel the user was looking at.
+
+  This is a **best guess, not a lookup**: a foreign IPv6 node will be labelled
+  with the phone's country, and a guessed country is treated like a looked-up
+  one by the country filter and the region grouping. The proper fix is an IPv6
+  GeoIP table, which is a separate piece of work.
+
+- **The session card is the page's card colour again.** The tint added in
+  0.9.33 read as a second kind of card rather than one live one, and the brand
+  blue is reserved for things you can act on. The "current" label, the exit
+  rows and the card's place at the top already distinguish it.
+
 ## [0.9.34] — 2026-11-15
 
 ### Changed
